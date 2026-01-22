@@ -1,0 +1,237 @@
+"""
+ACORD Data Formatter
+
+Transforms organized ACORD data into tabbed UI format matching the target display.
+"""
+
+from typing import Dict, Any, Optional
+
+
+def format_checkbox(value: Any) -> str:
+    """Convert checkbox/indicator value to 'Yes' or 'No' string."""
+    if value is None:
+        return "No"
+    if isinstance(value, bool):
+        return "Yes" if value else "No"
+    if isinstance(value, str):
+        val_lower = value.lower().strip()
+        if val_lower in ['yes', 'y', 'true', '1', '/1', '/yes', 'x', 'checked']:
+            return "Yes"
+    return "No"
+
+
+def format_limit(value: Any) -> str:
+    """Format currency/limit value."""
+    if value is None:
+        return ""
+    
+    # Handle boolean-like strings that shouldn't be in limit fields
+    if isinstance(value, str):
+        val_lower = value.lower().strip()
+        if val_lower in ['yes', 'no', 'true', 'false', 'y', 'n']:
+            return ""
+            
+    return str(value)
+
+
+def _get_name_only(data: Any) -> str:
+    """Extract only the name field from a dict, or return empty if null/missing."""
+    if data is None:
+        return ""
+    if isinstance(data, str):
+        # If it's a string, check if it looks like an address (has numbers/commas)
+        # If so, return empty since we want name only
+        return "" if any(c.isdigit() for c in data) else data
+    if isinstance(data, dict):
+        name = data.get("name")
+        if name and name.lower() != "null" and name.strip():
+            return name
+    return ""
+
+
+def _get_address_only(data: Any) -> str:
+    """Extract only the address field from a dict."""
+    if data is None:
+        return ""
+    if isinstance(data, str):
+        return data if any(c.isdigit() for c in data) else ""
+    if isinstance(data, dict):
+        return data.get("address", "") or ""
+    return ""
+
+
+def format_for_tabs(organized_data: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Transform organized ACORD data into tabbed UI format.
+    
+    Input: Flat schema from AI parsing (for validation)
+    Output: Tabbed structure matching UI images
+    
+    Args:
+        organized_data: Data from AcordOrganizer (flat schema)
+        
+    Returns:
+        Data formatted for tabbed UI display
+    """
+    # Extract source data with defaults
+    gl = organized_data.get("general_liability", {}) or {}
+    auto = organized_data.get("auto_liability", {}) or {}
+    umbrella = organized_data.get("umbrella", {}) or {}
+    wc = organized_data.get("workers_comp", {}) or {}
+    cert_holder = organized_data.get("certificate_holder", {}) or {}
+    insured = organized_data.get("insured", {}) or {}
+    producer = organized_data.get("producer", {}) or {}
+    insurers = organized_data.get("insurers", []) or []
+    other = organized_data.get("other", {}) or {}
+    
+    # Build tabbed output structure
+    tabbed_output = {
+        "information": {
+            "certificate_date": organized_data.get("issue_date"),
+            "description_of_operations": organized_data.get("remarks"),
+            "certificate_holder": _get_name_only(cert_holder)
+        },
+        "general_liability": {
+            "policy_information": {
+                "policy_number": gl.get("policy_number"),
+                "effective_date": gl.get("effective_date"),
+                "expiration_date": gl.get("expiration_date"),
+                "additional_insured": format_checkbox(gl.get("additional_insured")),
+                "subrogation_waived": format_checkbox(gl.get("subrogation_waived"))
+            },
+            "policy_options": {
+                "claims_made": format_checkbox(gl.get("claims_made")),
+                "occurrence": format_checkbox(gl.get("occurrence")),
+                "aggregate_applies_policy": format_checkbox(gl.get("policy")),
+                "aggregate_applies_project": format_checkbox(gl.get("project")),
+                "aggregate_applies_location": format_checkbox(gl.get("loc"))
+            },
+            "policy_limits": {
+                "each_occurrence": format_limit(gl.get("each_occurrence")),
+                "damage_to_rented_premises": format_limit(gl.get("damage_to_rented_premises")),
+                "med_exp": format_limit(gl.get("medical_expense")),
+                "personal_adv_injury": format_limit(gl.get("personal_adv_injury")),
+                "general_aggregate": format_limit(gl.get("general_aggregate")),
+                "products_comp_op_agg": format_limit(gl.get("products_comp_op_agg"))
+            }
+        },
+        "automobile_liability": {
+            "policy_information": {
+                "policy_number": auto.get("policy_number"),
+                "effective_date": auto.get("effective_date"),
+                "expiration_date": auto.get("expiration_date"),
+                "additional_insured": format_checkbox(auto.get("additional_insured")),
+                "subrogation_waived": format_checkbox(auto.get("subrogation_waived"))
+            },
+            "policy_options": {
+                "any_auto": format_checkbox(auto.get("any_auto")),
+                "allowed_autos": format_checkbox(auto.get("all_owned")),  # Mapped to 'allowed_autos' for UI
+                "scheduled_autos": format_checkbox(auto.get("scheduled")),
+                "hired_autos": format_checkbox(auto.get("hired")),
+                "non_owned_autos": format_checkbox(auto.get("non_owned"))
+            },
+            "policy_limits": {
+                "combined_single_limit": format_limit(auto.get("combined_single_limit")),
+                "combined_single_limit_ea_accident": format_limit(auto.get("combined_single_limit")), # Legacy alias
+                "bodily_injury_person": format_limit(auto.get("bodily_injury_per_person")),
+                "bodily_injury_accident": format_limit(auto.get("bodily_injury_per_accident")),
+                "property_damage": format_limit(auto.get("property_damage"))
+            }
+        },
+        "umbrella_liability": {
+            "policy_information": {
+                "policy_number": umbrella.get("policy_number"),
+                "effective_date": umbrella.get("effective_date"),
+                "expiration_date": umbrella.get("expiration_date"),
+                "additional_insured": format_checkbox(umbrella.get("additional_insured")),
+                "subrogation_waived": format_checkbox(umbrella.get("subrogation_waived"))
+            },
+            "policy_options": {
+                "umbrella_liability": format_checkbox(umbrella.get("umbrella_liab")),
+                "excess_liability": format_checkbox(umbrella.get("excess_liab")),
+                "occurrence": format_checkbox(umbrella.get("occurrence")),
+                "claims_made": format_checkbox(umbrella.get("claims_made")),
+                "deductible": format_checkbox(umbrella.get("deductible")),
+                "retention_checkbox": format_checkbox(umbrella.get("retention")),
+                "retention": format_limit(umbrella.get("retention_amount"))
+            },
+            "policy_limits": {
+                "each_occurrence": format_limit(umbrella.get("each_occurrence")),
+                "aggregate": format_limit(umbrella.get("aggregate"))
+            }
+        },
+        "workers_comp": {
+            "policy_information": {
+                "policy_number": wc.get("policy_number"),
+                "effective_date": wc.get("effective_date"),
+                "expiration_date": wc.get("expiration_date"),
+                "additional_insured": format_checkbox(wc.get("additional_insured")),
+                "subrogation_waived": format_checkbox(wc.get("subrogation_waived"))
+            },
+            "policy_options": {
+                "any_officers_excluded": format_checkbox(wc.get("any_excluded")),
+                "other": format_checkbox(wc.get("other"))
+            },
+            "policy_limits": {
+                "per_statute": format_checkbox(wc.get("per_statute")),
+                "per_statute_other_limit": format_limit(wc.get("each_accident")),  # Map specific limit
+                "each_accident": format_limit(wc.get("each_accident")),
+                "each_employee": format_limit(wc.get("disease_each_employee")),
+                "disease_policy_limit": format_limit(wc.get("disease_policy_limit"))
+            }
+        },
+        "other_coverage": {
+             "policy_information": {
+                "first_policy_number": other.get("policy_number"),
+                "first_effective_date": other.get("effective_date"),
+                "first_expiration_date": other.get("expiration_date"), 
+                # Note: Validation rules ask for specific fields (first/second/third) which might not
+                # extract directly from standard "other" structure, mapping what we can
+             }
+        },
+        "notes": organized_data.get("remarks") if organized_data.get("remarks") else None,
+        
+        # Other Data tab - contains remaining extracted data
+        "other_data": {
+            "insured": {
+                "name": _get_name_only(insured),
+                "address": _get_address_only(insured)
+            },
+            "producer": {
+                "name": _get_name_only(producer),
+                "address": _get_address_only(producer),
+                "contact": producer.get("contact") if isinstance(producer, dict) else None,
+                "phone": producer.get("phone") if isinstance(producer, dict) else None,
+                "fax": producer.get("fax") if isinstance(producer, dict) else None,
+                "email": producer.get("email") if isinstance(producer, dict) else None
+            },
+            "certificate_holder": {
+                "name": _get_name_only(cert_holder),
+                "address": _get_address_only(cert_holder)
+            },
+            "certificate_number": organized_data.get("certificate_number"),
+            "authorized_representative": organized_data.get("authorized_representative"),
+            "insurers": insurers
+        }
+    }
+    
+    return tabbed_output
+
+
+class AcordFormatter:
+    """Service class for formatting ACORD data for UI display."""
+    
+    def __init__(self):
+        pass
+    
+    def format(self, organized_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Format organized data for tabbed UI display.
+        
+        Args:
+            organized_data: Data from AcordOrganizer
+            
+        Returns:
+            Tabbed format matching UI images
+        """
+        return format_for_tabs(organized_data)

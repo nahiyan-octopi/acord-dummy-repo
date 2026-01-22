@@ -1,0 +1,55 @@
+"""
+Configuration management for ACORD Data Extractor API
+"""
+import os
+from pathlib import Path
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
+
+
+class Config:
+    """Base configuration class"""
+    
+    # Groq API Configuration
+    GROQ_API_KEY = os.getenv('GROQ_API_KEY')
+    GROQ_MODEL = os.getenv('GROQ_MODEL', 'llama-3.1-8b-instant')
+    GROQ_TEMPERATURE = float(os.getenv('GROQ_TEMPERATURE', 0))
+    GROQ_MAX_TOKENS = int(os.getenv('GROQ_MAX_TOKENS', 4096))
+    
+    # Application Configuration
+    DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
+    APP_NAME = "ACORD Data Extractor API"
+    VERSION = "2.0.0"
+    
+    # PDF Processing Settings
+    PDF_DPI = int(os.getenv('PDF_DPI', 300))
+    MAX_PAGES = int(os.getenv('MAX_PAGES', 50))
+    
+    # File Configuration
+    BASE_DIR = Path(__file__).parent.parent
+    UPLOAD_FOLDER = BASE_DIR / 'uploads'
+    OUTPUT_FOLDER = BASE_DIR / 'output'
+    
+    # Maximum file size (50MB)
+    MAX_CONTENT_LENGTH = int(os.getenv('MAX_CONTENT_LENGTH', 50 * 1024 * 1024))
+    
+    # Allowed file extensions
+    ALLOWED_EXTENSIONS = {'pdf'}
+    
+    # CORS Configuration
+    CORS_ORIGINS = ["*"]  # Allow all origins for API usage
+    
+    @classmethod
+    def init_app(cls):
+        """Initialize application folders"""
+        cls.UPLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
+        cls.OUTPUT_FOLDER.mkdir(parents=True, exist_ok=True)
+    
+    @classmethod
+    def validate_api_key(cls):
+        """Validate that Groq API key is configured"""
+        if not cls.GROQ_API_KEY:
+            raise ValueError("GROQ_API_KEY is not set in environment variables")
+        return True

@@ -1,0 +1,63 @@
+"""
+ACORD Data Extractor API
+
+Minimal backend API for extracting data from ACORD PDF forms using Groq Llama.
+"""
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+
+from backend.config import Config
+from backend.routes.extraction import router as extraction_router
+
+# Initialize configuration
+Config.init_app()
+
+# Initialize FastAPI app
+app = FastAPI(
+    title="ACORD Data Extractor API",
+    version=Config.VERSION,
+    description="ACORD PDF Data Extraction using Groq Llama"
+)
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=Config.CORS_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Include extraction routes
+app.include_router(extraction_router)
+
+
+@app.get("/")
+async def root():
+    """API root endpoint"""
+    return {
+        "name": Config.APP_NAME,
+        "version": Config.VERSION,
+        "status": "running",
+        "endpoints": {
+            "extract": "POST /api/extract-acord",
+            "detect": "POST /api/detect-acord",
+            "health": "GET /health"
+        }
+    }
+
+
+@app.get("/health")
+async def health_check():
+    """Health check endpoint"""
+    return {
+        "status": "healthy",
+        "version": Config.VERSION,
+        "model": Config.GROQ_MODEL
+    }
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8001)
