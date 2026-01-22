@@ -1,6 +1,6 @@
 # ACORD Data Extractor API
 
-A production-ready API for extracting structured data from ACORD 25 Certificate of Liability Insurance PDFs using GPT-4-turbo.
+A production-ready API for extracting structured data from ACORD 25 Certificate of Liability Insurance PDFs using Groq (Llama 3.3-70B).
 
 ---
 
@@ -9,7 +9,7 @@ A production-ready API for extracting structured data from ACORD 25 Certificate 
 This API processes fillable ACORD PDF forms and extracts insurance certificate data into a standardized JSON format. The extraction pipeline uses:
 
 1. **PyPDF** - Extracts raw form fields with 100% accuracy from fillable PDFs
-2. **GPT-4-turbo** - Organizes and maps extracted fields to a standardized schema
+2. **Groq (Llama 3.3-70B)** - Organizes and maps extracted fields to a standardized schema
 3. **Field Mappings** - Uses explicit ACORD field mappings for consistent results
 
 ### Supported Form Types
@@ -20,18 +20,19 @@ This API processes fillable ACORD PDF forms and extracts insurance certificate d
 
 ### Model Performance
 
-This API uses **GPT-4-turbo** for intelligent field organization. Performance characteristics:
+This API uses **Groq (Llama 3.3-70B)** for intelligent field organization. Performance characteristics:
 
 | Metric | Value |
 |--------|-------|
-| **Model** | gpt-4-turbo |
-| **Average Response Time** | 3-5 seconds |
+| **Model** | llama-3.3-70b-versatile |
+| **Average Response Time** | 1-2 seconds |
 | **Token Usage** | ~2,000-3,000 tokens per extraction |
 | **Field Mapping Accuracy** | 95%+ (with explicit mappings) |
 | **Temperature** | 0 (deterministic output) |
 
-**Why GPT-4-turbo?**
+**Why Groq?**
 
+- **Ultra-fast inference** - Powered by LPU™ (Language Processing Unit) for blazing speed
 - **Superior instruction following** - Accurately maps complex ACORD field names to schema
 - **JSON mode support** - Guarantees valid JSON output
 - **Large context window** - Handles PDFs with 100+ form fields
@@ -44,7 +45,7 @@ This API uses **GPT-4-turbo** for intelligent field organization. Performance ch
 ### Prerequisites
 
 - Python 3.10+
-- OpenAI API key with GPT-4-turbo access
+- Groq API key
 - pipenv (recommended) or pip
 
 ### Installation
@@ -66,7 +67,7 @@ Create a `.env` file in the project root:
 
 ```env
 # Required
-OPENAI_API_KEY=your-api-key-here
+GROQ_API_KEY=your-api-key-here
 
 ### Running the Server
 
@@ -105,7 +106,7 @@ Returns API status and configuration.
 {
   "status": "healthy",
   "version": "1.0.0",
-  "model": "gpt-4-turbo"
+  "model": "llama-3.3-70b-versatile"
 }
 ```
 
@@ -279,7 +280,7 @@ Acord_Final/
 │       │   ├── acord_organizer.py # GPT-4 organization
 │       │   └── acord_pipeline.py  # Main pipeline
 │       └── ai/
-│           └── openai_service.py  # OpenAI API client
+│           └── groq_service.py    # Groq API client
 ├── output/                        # Saved extraction JSON files
 └── uploads/                       # Temporary upload storage
 ```
@@ -318,7 +319,7 @@ For production environments:
 | Issue | Solution |
 |-------|----------|
 | Port already in use | Change port in `backend/app.py` (default: 8001) |
-| OpenAI API error | Verify API key has GPT-4-turbo access |
+| Groq API error | Verify API key is valid and has access |
 | Empty extraction | Ensure PDF is a fillable form (not scanned) |
 | Missing fields | Check `acord_field_mappings.json` for mapping coverage |
 
