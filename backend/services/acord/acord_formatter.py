@@ -93,6 +93,7 @@ def format_for_tabs(organized_data: Dict[str, Any]) -> Dict[str, Any]:
         },
         "general_liability": {
             "policy_information": {
+                "insurer_letter": gl.get("insurer_letter"),
                 "policy_number": gl.get("policy_number"),
                 "effective_date": gl.get("effective_date"),
                 "expiration_date": gl.get("expiration_date"),
@@ -117,6 +118,7 @@ def format_for_tabs(organized_data: Dict[str, Any]) -> Dict[str, Any]:
         },
         "automobile_liability": {
             "policy_information": {
+                "insurer_letter": auto.get("insurer_letter"),
                 "policy_number": auto.get("policy_number"),
                 "effective_date": auto.get("effective_date"),
                 "expiration_date": auto.get("expiration_date"),
@@ -125,14 +127,14 @@ def format_for_tabs(organized_data: Dict[str, Any]) -> Dict[str, Any]:
             },
             "policy_options": {
                 "any_auto": format_checkbox(auto.get("any_auto")),
-                "allowed_autos": format_checkbox(auto.get("all_owned")),  # Mapped to 'allowed_autos' for UI
+                "allowed_autos": format_checkbox(auto.get("all_owned")),  
                 "scheduled_autos": format_checkbox(auto.get("scheduled")),
                 "hired_autos": format_checkbox(auto.get("hired")),
                 "non_owned_autos": format_checkbox(auto.get("non_owned"))
             },
             "policy_limits": {
                 "combined_single_limit": format_limit(auto.get("combined_single_limit")),
-                "combined_single_limit_ea_accident": format_limit(auto.get("combined_single_limit")), # Legacy alias
+                "combined_single_limit_ea_accident": format_limit(auto.get("combined_single_limit")), 
                 "bodily_injury_person": format_limit(auto.get("bodily_injury_per_person")),
                 "bodily_injury_accident": format_limit(auto.get("bodily_injury_per_accident")),
                 "property_damage": format_limit(auto.get("property_damage"))
@@ -140,6 +142,7 @@ def format_for_tabs(organized_data: Dict[str, Any]) -> Dict[str, Any]:
         },
         "umbrella_liability": {
             "policy_information": {
+                "insurer_letter": umbrella.get("insurer_letter"),
                 "policy_number": umbrella.get("policy_number"),
                 "effective_date": umbrella.get("effective_date"),
                 "expiration_date": umbrella.get("expiration_date"),
@@ -162,6 +165,7 @@ def format_for_tabs(organized_data: Dict[str, Any]) -> Dict[str, Any]:
         },
         "workers_comp": {
             "policy_information": {
+                "insurer_letter": wc.get("insurer_letter"),
                 "policy_number": wc.get("policy_number"),
                 "effective_date": wc.get("effective_date"),
                 "expiration_date": wc.get("expiration_date"),

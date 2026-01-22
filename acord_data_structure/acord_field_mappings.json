@@ -115,7 +115,8 @@
             }
         ],
         "remarks": null,
-        "authorized_representative": null
+        "authorized_representative": null,
+        "unmapped_fields": {}
     },
     "fieldMappings": {
         "Form_CompletionDate_A": "issue_date",

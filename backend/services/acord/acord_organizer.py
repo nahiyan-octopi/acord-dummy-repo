@@ -138,18 +138,21 @@ TARGET SCHEMA (output must match this structure exactly):
 KNOWN FIELD MAPPINGS (PDF field name → schema path):
 {mappings_text}
 
-RAW EXTRACTED DATA FROM PDF:
+RAW EXTRACTED DATA FROM PDF (ALL fields extracted):
 {raw_data_text}
 
-INSTRUCTIONS:
-1. Map the raw fields to the target schema using the known mappings
+CRITICAL INSTRUCTIONS FOR COMPLETE EXTRACTION:
+1. Map ALL raw fields to the target schema using the known mappings above
 2. For fields with multiple address components, combine them into a single address string
 3. For checkbox fields, use "Yes" or "No"
 4. For missing fields, use null
-5. Return ONLY the JSON object matching the target schema structure
-6. Do NOT include any explanation or text outside the JSON
+5. IMPORTANT: For any field that contains "InsurerLetterCode" or "INSR" or ends with "_LTR", map it to the appropriate insurer_letter field (general_liability.insurer_letter, auto_liability.insurer_letter, umbrella.insurer_letter, or workers_comp.insurer_letter)
+6. IMPORTANT: Add an "unmapped_fields" object containing ANY fields from the raw data that do NOT match any known mapping. Use the original field name as the key.
+7. Return ONLY the JSON object - no explanation or text outside the JSON
 
-Return the organized JSON now:"""
+The output JSON must include ALL data from the PDF. Do not discard any information.
+
+Return the complete organized JSON now:"""
 
         return prompt
     
