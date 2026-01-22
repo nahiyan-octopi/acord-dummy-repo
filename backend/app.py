@@ -3,12 +3,14 @@ ACORD Data Extractor API
 
 Minimal backend API for extracting data from ACORD PDF forms using Groq Llama.
 """
+import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from backend.config import Config
 from backend.routes.extraction import router as extraction_router
+from backend.core.keep_alive import start_keep_alive
 
 # Initialize configuration
 Config.init_app()
@@ -31,6 +33,14 @@ app.add_middleware(
 
 # Include extraction routes
 app.include_router(extraction_router)
+
+
+@app.on_event("startup")
+async def startup_event():
+    """Start keep-alive pinger on Render deployment."""
+    if os.environ.get('RENDER'):
+        start_keep_alive()
+
 
 
 @app.get("/")
