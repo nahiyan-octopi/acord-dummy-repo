@@ -186,11 +186,17 @@ def format_for_tabs(organized_data: Dict[str, Any]) -> Dict[str, Any]:
         },
         "other_coverage": {
              "policy_information": {
-                "first_policy_number": other.get("policy_number"),
-                "first_effective_date": other.get("effective_date"),
-                "first_expiration_date": other.get("expiration_date"), 
-                # Note: Validation rules ask for specific fields (first/second/third) which might not
-                # extract directly from standard "other" structure, mapping what we can
+                "insurer_letter": other.get("insurer_letter"),
+                "type_of_insurance": other.get("type_of_insurance"),
+                "policy_number": other.get("policy_number"),
+                "effective_date": other.get("effective_date"),
+                "expiration_date": other.get("expiration_date"),
+                "additional_insured": format_checkbox(other.get("addl")),
+                "subrogation_waived": format_checkbox(other.get("subr"))
+             },
+             "coverage_details": {
+                "description": other.get("description"),
+                "limit_amount": format_limit(other.get("limit_amount"))
              }
         },
         "notes": organized_data.get("remarks") if organized_data.get("remarks") else None,

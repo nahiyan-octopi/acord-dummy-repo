@@ -82,6 +82,17 @@
             "additional_insured": null,
             "subrogation_waived": null
         },
+        "other": {
+            "insurer_letter": null,
+            "type_of_insurance": null,
+            "addl": null,
+            "subr": null,
+            "policy_number": null,
+            "effective_date": null,
+            "expiration_date": null,
+            "description": null,
+            "limit_amount": null
+        },
         "insurers": [
             {
                 "letter": "A",
@@ -193,6 +204,15 @@
         "Insurer_NAICCode_C": "insurers[2].naic",
         "Insurer_FullName_D": "insurers[3].name",
         "Insurer_NAICCode_D": "insurers[3].naic",
+        "OtherCoverage_InsurerLetterCode_A": "other.insurer_letter",
+        "OtherCoverage_TypeOfInsurance_A": "other.type_of_insurance",
+        "OtherCoverage_AdditionalInsuredIndicator_A": "other.addl",
+        "OtherCoverage_SubrogationWaivedIndicator_A": "other.subr",
+        "Policy_OtherCoverage_PolicyNumberIdentifier_A": "other.policy_number",
+        "Policy_OtherCoverage_EffectiveDate_A": "other.effective_date",
+        "Policy_OtherCoverage_ExpirationDate_A": "other.expiration_date",
+        "OtherCoverage_Description_A": "other.description",
+        "OtherCoverage_LimitAmount_A": "other.limit_amount",
         "CertificateOfLiabilityInsurance_ACORDForm_RemarkText_A": "remarks",
         "Producer_AuthorizedRepresentative_Signature_A": "authorized_representative"
     },
