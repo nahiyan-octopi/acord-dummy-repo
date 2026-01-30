@@ -29,8 +29,17 @@ class Config:
     
     # File Configuration
     BASE_DIR = Path(__file__).parent.parent
-    UPLOAD_FOLDER = BASE_DIR / 'uploads'
-    OUTPUT_FOLDER = BASE_DIR / 'output'
+    
+    # Vercel uses /tmp for writable storage (serverless environment)
+    # Check if running on Vercel
+    IS_VERCEL = os.getenv('VERCEL') == '1' or os.getenv('VERCEL_ENV') is not None
+    
+    if IS_VERCEL:
+        UPLOAD_FOLDER = Path('/tmp/uploads')
+        OUTPUT_FOLDER = Path('/tmp/output')
+    else:
+        UPLOAD_FOLDER = BASE_DIR / 'uploads'
+        OUTPUT_FOLDER = BASE_DIR / 'output'
     
     # Maximum file size (50MB)
     MAX_CONTENT_LENGTH = int(os.getenv('MAX_CONTENT_LENGTH', 50 * 1024 * 1024))
