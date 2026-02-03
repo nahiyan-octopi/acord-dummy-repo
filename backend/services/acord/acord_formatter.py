@@ -187,17 +187,18 @@ def format_for_tabs(organized_data: Dict[str, Any]) -> Dict[str, Any]:
         "other_coverage": {
              "policy_information": {
                 "insurer_letter": other.get("insurer_letter"),
-                "type_of_insurance": other.get("type_of_insurance"),
+                "type_of_insurance": other.get("type_of_insurance") if other.get("type_of_insurance") else "Other",
                 "policy_number": other.get("policy_number"),
                 "effective_date": other.get("effective_date"),
                 "expiration_date": other.get("expiration_date"),
                 "additional_insured": format_checkbox(other.get("addl")),
                 "subrogation_waived": format_checkbox(other.get("subr"))
              },
-             "coverage_details": {
-                "description": other.get("description"),
-                "limit_amount": format_limit(other.get("limit_amount"))
-             }
+             "policy_limits": [
+                {"First Policy Option": other.get("first_policy_option"), "First Policy Limit": format_limit(other.get("first_policy_limit"))},
+                {"Second Policy Option": other.get("second_policy_option"), "Second Policy Limit": format_limit(other.get("second_policy_limit"))},
+                {"Third Policy Option": other.get("third_policy_option"), "Third Policy Limit": format_limit(other.get("third_policy_limit"))}
+             ]
         },
         "notes": organized_data.get("remarks") if organized_data.get("remarks") else None,
         

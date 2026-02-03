@@ -91,7 +91,12 @@
             "effective_date": null,
             "expiration_date": null,
             "description": null,
-            "limit_amount": null
+            "first_policy_option": null,
+            "first_policy_limit": null,
+            "second_policy_option": null,
+            "second_policy_limit": null,
+            "third_policy_option": null,
+            "third_policy_limit": null
         },
         "insurers": [
             {
@@ -211,10 +216,8 @@
         "Policy_OtherCoverage_PolicyNumberIdentifier_A": "other.policy_number",
         "Policy_OtherCoverage_EffectiveDate_A": "other.effective_date",
         "Policy_OtherCoverage_ExpirationDate_A": "other.expiration_date",
-        "OtherCoverage_Description_A": "other.description",
-        "OtherCoverage_LimitAmount_A": "other.limit_amount",
         "CertificateOfLiabilityInsurance_ACORDForm_RemarkText_A": "remarks",
         "Producer_AuthorizedRepresentative_Signature_A": "authorized_representative"
     },
-    "promptInstructions": "You are organizing ACORD 25 insurance certificate data. Map the raw extracted PDF fields to the target schema.\n\nRULES:\n1. For address fields, combine multiple address lines into a single complete address string.\n2. For checkbox fields, use 'Yes' or 'No'.\n3. For currency/limit amounts, keep the numeric value with formatting (e.g., '1,000,000').\n4. For missing fields, use null.\n5. Return ONLY valid JSON matching the target schema structure.\n6. Do NOT include any explanation or text outside the JSON."
+    "promptInstructions": "You are organizing ACORD 25 insurance certificate data. Map the raw extracted PDF fields to the target schema.\n\nRULES:\n1. For address fields, combine multiple address lines into a single complete address string.\n2. For checkbox fields, use 'Yes' or 'No'.\n3. For currency/limit amounts, keep the numeric value with formatting (e.g., '1,000,000').\n4. For missing fields, use null.\n5. Return ONLY valid JSON matching the target schema structure.\n6. Do NOT include any explanation or text outside the JSON.\n7. For 'Other' coverage limits, you MUST parse the content (likely from OtherCoverage_LimitAmount_A or similar) to extract up to 3 distinct policy options and limits. Map them to 'first_policy_option'/'first_policy_limit', 'second_policy_option'/'second_policy_limit', etc. The 'option' is the left part of the text (e.g. 'Deductible') and 'limit' is the right part (value). Split multiple lines if present."
 }
