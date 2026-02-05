@@ -7,7 +7,7 @@ Returns exact field names and values with 100% accuracy.
 
 import logging
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 from pypdf import PdfReader
 
 # Suppress PyPDF warning messages about malformed PDFs
@@ -138,57 +138,29 @@ def _clean_field_name(field_name: str) -> str:
     return cleaned
 
 
-def get_all_field_names(pdf_path: str | Path) -> list:
+def _prepare_for_openai(extraction_result: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Get list of all form field names in a PDF.
-    
-    Args:
-        pdf_path: Path to PDF file
-        
-    Returns:
-        List of field names (sorted)
+    Prepare an extraction result for OpenAI processing.
     """
-    result = extract_form_fields(pdf_path)
-    if result["success"]:
-        all_names = list(result["fields"].keys()) + list(result["checkboxes"].keys())
-        return sorted(all_names)
-    return []
-
-
-def extract_for_llama(pdf_path: str | Path) -> Dict[str, Any]:
-    """
-    Extract form fields in a format ready for Llama processing.
-    
-    Combines text fields and checkboxes into a single dict,
-    converting checkbox booleans to "Yes"/"No" strings.
-    
-    Args:
-        pdf_path: Path to PDF file
-        
-    Returns:
-        Dictionary ready to send to Llama for organization
-    """
-    result = extract_form_fields(pdf_path)
-    
-    if not result["success"]:
+    if not extraction_result.get("success"):
         return {
             "success": False,
-            "error": result.get("error", "Extraction failed"),
+            "error": extraction_result.get("error", "Extraction failed"),
             "data": {}
         }
-    
+
     # Combine fields and checkboxes
     combined = {}
-    
+
     # Add text fields
-    for name, value in result["fields"].items():
+    for name, value in extraction_result.get("fields", {}).items():
         if value is not None:
             combined[name] = value
-    
+
     # Add checkboxes as Yes/No
-    for name, is_checked in result["checkboxes"].items():
+    for name, is_checked in extraction_result.get("checkboxes", {}).items():
         combined[name] = "Yes" if is_checked else "No"
-    
+
     return {
         "success": True,
         "field_count": len(combined),
@@ -196,94 +168,8 @@ def extract_for_llama(pdf_path: str | Path) -> Dict[str, Any]:
     }
 
 
-def has_extractable_text(pdf_path: str | Path, min_chars: int = 100) -> bool:
+def extract_for_openai_from_result(extraction_result: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Check if a PDF has extractable text (not scanned/image-only).
-    
-    Args:
-        pdf_path: Path to PDF file
-        min_chars: Minimum characters to consider PDF as text-based
-        
-    Returns:
-        True if PDF has extractable text, False if likely scanned
+    Prepare data for OpenAI using an existing extraction result.
     """
-    pdf_path = Path(pdf_path)
-    
-    try:
-        reader = PdfReader(str(pdf_path))
-        total_text = ""
-        
-        for page in reader.pages[:3]:  # Check first 3 pages
-            text = page.extract_text() or ""
-            total_text += text
-            
-            if len(total_text) >= min_chars:
-                return True
-        
-        return len(total_text.strip()) >= min_chars
-        
-    except Exception:
-        return False
-
-
-def extract_text_content(pdf_path: str | Path) -> Dict[str, Any]:
-    """
-    Extract plain text content from a text-based PDF using PyPDF.
-    Does NOT use OCR - only works on PDFs with selectable text.
-    
-    Args:
-        pdf_path: Path to PDF file
-        
-    Returns:
-        Dictionary with extraction results:
-        {
-            "success": bool,
-            "text": str (full extracted text),
-            "pages": list (text per page),
-            "page_count": int,
-            "extraction_method": "pypdf",
-            "error": str (if failed)
-        }
-    """
-    pdf_path = Path(pdf_path)
-    
-    if not pdf_path.exists():
-        return {
-            "success": False,
-            "text": "",
-            "pages": [],
-            "page_count": 0,
-            "extraction_method": "pypdf",
-            "error": f"PDF file not found: {pdf_path}"
-        }
-    
-    try:
-        reader = PdfReader(str(pdf_path))
-        pages_text = []
-        full_text = ""
-        
-        for i, page in enumerate(reader.pages):
-            page_text = page.extract_text() or ""
-            pages_text.append({
-                "page_number": i + 1,
-                "text": page_text.strip()
-            })
-            full_text += page_text + "\n\n"
-        
-        return {
-            "success": True,
-            "text": full_text.strip(),
-            "pages": pages_text,
-            "page_count": len(reader.pages),
-            "extraction_method": "pypdf"
-        }
-        
-    except Exception as e:
-        return {
-            "success": False,
-            "text": "",
-            "pages": [],
-            "page_count": 0,
-            "extraction_method": "pypdf",
-            "error": str(e)
-        }
+    return _prepare_for_openai(extraction_result)

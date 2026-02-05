@@ -64,18 +64,9 @@ class AcordOrganizer:
         prompt = self._build_prompt(raw_fields)
         
         try:
-            # Call OpenAI API
+            # Call OpenAI API with minimal overhead
             response = self.openai_service.chat_completion(
-                messages=[
-                    {
-                        "role": "system",
-                        "content": "You are an expert at organizing ACORD insurance form data. Return ONLY valid JSON with no additional text or explanation."
-                    },
-                    {
-                        "role": "user",
-                        "content": prompt
-                    }
-                ],
+                messages=[{"role": "user", "content": prompt}],
                 temperature=0,
                 response_format={"type": "json_object"}
             )
@@ -105,7 +96,7 @@ class AcordOrganizer:
     
     def _build_prompt(self, raw_fields: Dict[str, Any]) -> str:
         """
-        Build the prompt for OpenAI with target schema and mappings.
+        Build a compact prompt for OpenAI.
         
         Args:
             raw_fields: Dictionary of raw PDF field names and values
@@ -113,56 +104,40 @@ class AcordOrganizer:
         Returns:
             Prompt string for OpenAI
         """
-        target_schema = self.mappings_data.get("targetSchema", {})
         field_mappings = self.mappings_data.get("fieldMappings", {})
-        instructions = self.mappings_data.get("promptInstructions", "")
         
-        # Build mappings text
-        mappings_text = "\n".join([
-            f"  {pdf_field} → {schema_path}"
-            for pdf_field, schema_path in field_mappings.items()
-        ])
+        # Match extracted fields to mappings (case-insensitive)
+        raw_field_names_lower = {k.lower(): k for k in raw_fields.keys()}
         
-        # Build raw data text (only non-null values)
-        raw_data_items = []
+        # Build data with schema paths
+        mapped_data = []
+        unmapped_data = []
+        
         for key, value in raw_fields.items():
-            if value is not None and str(value).strip():
-                raw_data_items.append(f'  "{key}": "{value}"')
-        raw_data_text = "{\n" + ",\n".join(raw_data_items) + "\n}"
+            if value is None or not str(value).strip():
+                continue
+            
+            # Find mapping for this field
+            schema_path = None
+            for pdf_field, path in field_mappings.items():
+                if pdf_field.lower() == key.lower():
+                    schema_path = path
+                    break
+            
+            if schema_path:
+                mapped_data.append(f'{schema_path}="{value}"')
+            else:
+                unmapped_data.append(f'{key}="{value}"')
         
-        prompt = f"""{instructions}
+        prompt = f"""Convert to nested JSON. Paths use dots for nesting (e.g. "a.b"="v" becomes {{"a":{{"b":"v"}}}}).
+Checkboxes/Indicators: "Yes"/"No". Combine address lines. insurers is array with letter/name/naic.
 
-TARGET SCHEMA (output must match this structure exactly):
-{json.dumps(target_schema, indent=2)}
+{chr(10).join(mapped_data)}
 
-KNOWN FIELD MAPPINGS (PDF field name → schema path):
-{mappings_text}
+unmapped_fields:
+{chr(10).join(unmapped_data) if unmapped_data else 'none'}
 
-RAW EXTRACTED DATA FROM PDF (ALL fields extracted):
-{raw_data_text}
-
-CRITICAL INSTRUCTIONS FOR COMPLETE EXTRACTION:
-1. Map ALL raw fields to the target schema using the known mappings above
-2. For fields with multiple address components, combine them into a single address string
-3. For checkbox fields (including "Indicator" fields), use "Yes" or "No"
-4. For missing fields, use null
-5. IMPORTANT: For any field that contains "InsurerLetterCode" or "INSR" or ends with "_LTR", map it to the appropriate insurer_letter field (general_liability.insurer_letter, auto_liability.insurer_letter, umbrella.insurer_letter, workers_comp.insurer_letter, or other.insurer_letter)
-6. IMPORTANT: For General Liability custom options (CustomOption1_A, CustomOption2_A), extract BOTH the checkbox state AND any associated text value
-7. IMPORTANT: For Auto Liability custom options (CustomOption1_A, CustomOption2_A), extract BOTH the checkbox state AND any associated text value  
-8. IMPORTANT: For General Aggregate Limit Applies Per fields, map them to:
-   - general_aggregate_limit_applies_per_policy (POLICY checkbox)
-   - general_aggregate_limit_applies_per_project (PROJECT checkbox)
-   - general_aggregate_limit_applies_per_location (LOC checkbox)
-   - general_aggregate_limit_applies_per_other (OTHER checkbox)
-   - general_aggregate_limit_applies_per_other_value (text value for OTHER)
-9. IMPORTANT: For Auto Liability vehicle options, use the correct field names:
-   - any_auto, owned_autos_only, hired_autos_only, scheduled_autos_only, non_owned_autos_only
-10. IMPORTANT: Add an "unmapped_fields" object containing ANY fields from the raw data that do NOT match any known mapping. Use the original field name as the key.
-11. Return ONLY the JSON object - no explanation or text outside the JSON
-
-The output JSON must include ALL data from the PDF. Do not discard any information.
-
-Return the complete organized JSON now:"""
+JSON only:"""
 
         return prompt
     

@@ -6,10 +6,11 @@ for ACORD form processing.
 """
 
 from pathlib import Path
+import time
 from typing import Dict, Any
 
 from app.services.acord.acord_detector import detect_acord_form
-from app.services.pypdf_extractor import extract_form_fields, extract_for_llama
+from app.services.pypdf_extractor import extract_form_fields, extract_for_openai_from_result
 from app.services.acord.acord_organizer import AcordOrganizer
 from app.services.acord.acord_formatter import AcordFormatter
 
@@ -54,7 +55,10 @@ class AcordExtractionPipeline:
         }
         
         # Step 1: Detect if ACORD form
+        t0 = time.perf_counter()
         detection = detect_acord_form(pdf_path)
+        t1 = time.perf_counter()
+        result["detection_time_ms"] = round((t1 - t0) * 1000, 2)
         result["detection"] = detection
         
         if not detection.get("is_fillable"):
@@ -66,7 +70,10 @@ class AcordExtractionPipeline:
             # Continue anyway but with warning
         
         # Step 2: Extract form fields using PyPDF (complete data)
+        t2 = time.perf_counter()
         extraction = extract_form_fields(pdf_path)
+        t3 = time.perf_counter()
+        result["extraction_time_ms"] = round((t3 - t2) * 1000, 2)
         result["extraction"] = {
             "field_count": extraction.get("field_count", 0),
             "success": extraction.get("success", False)
@@ -76,15 +83,21 @@ class AcordExtractionPipeline:
             result["error"] = extraction.get("error", "Extraction failed")
             return result
         
-        # Prepare data for GPT-4-turbo
-        llama_data = extract_for_llama(pdf_path)
+        # Prepare data for GPT-4-turbo without re-reading the PDF
+        t4 = time.perf_counter()
+        openai_data = extract_for_openai_from_result(extraction)
+        t5 = time.perf_counter()
+        result["prep_time_ms"] = round((t5 - t4) * 1000, 2)
         
-        if not llama_data.get("success"):
-            result["error"] = llama_data.get("error", "Failed to prepare data for organization")
+        if not openai_data.get("success"):
+            result["error"] = openai_data.get("error", "Failed to prepare data for organization")
             return result
         
         # Step 3: Organize data using GPT-4-turbo
-        organization = self.organizer.organize(llama_data.get("data", {}))
+        t6 = time.perf_counter()
+        organization = self.organizer.organize(openai_data.get("data", {}))
+        t7 = time.perf_counter()
+        result["organization_time_ms"] = round((t7 - t6) * 1000, 2)
         result["organization"] = organization
         
         if not organization.get("success"):
@@ -94,25 +107,16 @@ class AcordExtractionPipeline:
         organized_data = organization.get("organized_data", {})
         
         # Step 4: Format data for output
+        t8 = time.perf_counter()
         formatted_data = self.formatter.format(organized_data)
+        t9 = time.perf_counter()
+        result["formatting_time_ms"] = round((t9 - t8) * 1000, 2)
         
         # Set overall success
         result["success"] = True
         result["formatted_data"] = formatted_data
         
         return result
-    
-    def extract_only(self, pdf_path: str | Path) -> Dict[str, Any]:
-        """
-        Extract and organize data (same as process for this simplified version).
-        
-        Args:
-            pdf_path: Path to PDF file
-            
-        Returns:
-            Extraction and organization results
-        """
-        return self.process(pdf_path)
 
 
 def process_acord_pdf(pdf_path: str | Path) -> Dict[str, Any]:

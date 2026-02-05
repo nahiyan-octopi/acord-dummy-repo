@@ -230,6 +230,7 @@
         "WorkersCompensationEmployersLiability_WorkersCompensationStatutoryLimitIndicator_A": "workers_comp.per_statute",
         "WorkersCompensationEmployersLiability_OtherCoverageIndicator_A": "workers_comp.other",
         "WorkersCompensationEmployersLiability_PerStatuteOrOtherLimitAmount_A": "workers_comp.per_statute_other_limit",
+        "WorkersCompensationEmployersLiability_OtherCoverageDescription_A": "workers_comp.per_statute_other_limit",
         "WorkersCompensationEmployersLiability_EmployersLiability_EachAccidentLimitAmount_A": "workers_comp.each_accident",
         "WorkersCompensationEmployersLiability_EmployersLiability_DiseaseEachEmployeeLimitAmount_A": "workers_comp.disease_each_employee",
         "WorkersCompensationEmployersLiability_EmployersLiability_DiseasePolicyLimitAmount_A": "workers_comp.disease_policy_limit",
