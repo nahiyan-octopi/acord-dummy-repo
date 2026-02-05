@@ -109,7 +109,7 @@ Returns API status and configuration.
 {
   "status": "healthy",
   "version": "1.0.0",
-  "model": "gpt-4-turbo"
+  "model": "gpt-3.5-turbo"
 }
 ```
 
