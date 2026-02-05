@@ -18,7 +18,7 @@ from fastapi.middleware.cors import CORSMiddleware
 app = FastAPI(
     title="ACORD Data Extractor API",
     version="2.0.0",
-    description="ACORD PDF Data Extraction using Groq Llama"
+    description="ACORD PDF Data Extraction using OpenAI GPT"
 )
 
 # Add CORS middleware
@@ -50,21 +50,21 @@ async def root():
 @app.get("/health")
 async def health_check():
     """Health check endpoint"""
-    groq_key = os.getenv("GROQ_API_KEY")
+    openai_key = os.getenv("OPENAI_API_KEY")
     return {
         "status": "healthy",
         "version": "2.0.0",
-        "groq_configured": bool(groq_key)
+        "openai_configured": bool(openai_key)
     }
 
 
 # Import and include the extraction router
 try:
-    from backend.routes.extraction import router as extraction_router
+    from app.routes.extraction import router as extraction_router
     app.include_router(extraction_router)
 except ImportError as e:
     # If import fails, add a fallback endpoint
     @app.post("/api/extract-acord")
     async def extract_fallback():
-        return {"error": f"Backend import failed: {str(e)}"}
+        return {"error": f"App import failed: {str(e)}"}
 

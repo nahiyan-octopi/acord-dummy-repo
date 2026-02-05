@@ -5,15 +5,15 @@ from fastapi import APIRouter, File, UploadFile, HTTPException, BackgroundTasks
 from fastapi.responses import JSONResponse
 from pathlib import Path
 
-from backend.config import Config
-from backend.core.utils import (
+from app.config import Config
+from app.core.utils import (
     save_upload_file,
     cleanup_file,
     save_json_output,
     get_file_info,
 )
-from backend.services.acord.acord_pipeline import AcordExtractionPipeline
-from backend.services.acord.acord_detector import detect_acord_form
+from app.services.acord.acord_pipeline import AcordExtractionPipeline
+from app.services.acord.acord_detector import detect_acord_form
 
 router = APIRouter(prefix="/api", tags=["extraction"])
 

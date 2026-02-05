@@ -1,31 +1,30 @@
 """
-Groq API Service for Llama models
+OpenAI API Service for GPT models
 """
-import json
 from typing import Optional, Dict, Any
-from groq import Groq
-from backend.config import Config
+import openai
+from app.config import Config
 
 
-class GroqService:
-    """Service for interacting with Groq API (Llama models)"""
+class OpenAIService:
+    """Service for interacting with OpenAI API"""
     
     def __init__(self, api_key: Optional[str] = None):
         """
-        Initialize Groq service
+        Initialize OpenAI service
         
         Args:
-            api_key: Groq API key (defaults to environment variable)
+            api_key: OpenAI API key (defaults to environment variable)
         """
-        self.api_key = api_key or Config.GROQ_API_KEY
-        self.model = Config.GROQ_MODEL
-        self.temperature = Config.GROQ_TEMPERATURE
-        self.max_tokens = Config.GROQ_MAX_TOKENS
+        self.api_key = api_key or Config.OPENAI_API_KEY
+        self.model = Config.OPENAI_MODEL
+        self.temperature = Config.OPENAI_TEMPERATURE
+        self.max_tokens = Config.OPENAI_MAX_TOKENS
         
         if not self.api_key:
-            raise ValueError("GROQ_API_KEY is not configured")
+            raise ValueError("OPENAI_API_KEY is not configured")
         
-        self.client = Groq(api_key=self.api_key)
+        self.client = openai.OpenAI(api_key=self.api_key)
     
     def chat_completion(
         self,
@@ -35,7 +34,7 @@ class GroqService:
         response_format: Optional[Dict] = None
     ) -> Dict[str, Any]:
         """
-        Generate a chat completion using Groq API
+        Generate a chat completion using OpenAI API
         
         Args:
             messages: List of message dicts with 'role' and 'content'
@@ -78,7 +77,7 @@ class GroqService:
     
     def test_connection(self) -> Dict[str, Any]:
         """
-        Test connection to Groq API
+        Test connection to OpenAI API
         
         Returns:
             Dictionary with success status and details
@@ -95,7 +94,7 @@ class GroqService:
             
             return {
                 "success": True,
-                "message": "Connected to Groq API",
+                "message": "Connected to OpenAI API",
                 "model": self.model
             }
         except Exception as e:
@@ -106,12 +105,12 @@ class GroqService:
 
 
 # Singleton instance
-_groq_service = None
+_openai_service = None
 
 
-def get_groq_service() -> GroqService:
-    """Get or create Groq service singleton"""
-    global _groq_service
-    if _groq_service is None:
-        _groq_service = GroqService()
-    return _groq_service
+def get_openai_service() -> OpenAIService:
+    """Get or create OpenAI service singleton"""
+    global _openai_service
+    if _openai_service is None:
+        _openai_service = OpenAIService()
+    return _openai_service

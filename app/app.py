@@ -1,16 +1,16 @@
 """
 ACORD Data Extractor API
 
-Minimal backend API for extracting data from ACORD PDF forms using Groq Llama.
+Minimal backend API for extracting data from ACORD PDF forms using OpenAI GPT.
 """
 import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from backend.config import Config
-from backend.routes.extraction import router as extraction_router
-from backend.core.keep_alive import start_keep_alive
+from app.config import Config
+from app.routes.extraction import router as extraction_router
+from app.core.keep_alive import start_keep_alive
 
 # Initialize configuration
 Config.init_app()
@@ -19,7 +19,7 @@ Config.init_app()
 app = FastAPI(
     title="ACORD Data Extractor API",
     version=Config.VERSION,
-    description="ACORD PDF Data Extraction using Groq Llama"
+    description="ACORD PDF Data Extraction using OpenAI GPT"
 )
 
 # Add CORS middleware
@@ -64,7 +64,7 @@ async def health_check():
     return {
         "status": "healthy",
         "version": Config.VERSION,
-        "model": Config.GROQ_MODEL
+        "model": Config.OPENAI_MODEL
     }
 
 

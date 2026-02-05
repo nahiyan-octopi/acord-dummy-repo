@@ -8,10 +8,10 @@ for ACORD form processing.
 from pathlib import Path
 from typing import Dict, Any
 
-from backend.services.acord.acord_detector import detect_acord_form
-from backend.services.pypdf_extractor import extract_form_fields, extract_for_llama
-from backend.services.acord.acord_organizer import AcordOrganizer
-from backend.services.acord.acord_formatter import AcordFormatter
+from app.services.acord.acord_detector import detect_acord_form
+from app.services.pypdf_extractor import extract_form_fields, extract_for_llama
+from app.services.acord.acord_organizer import AcordOrganizer
+from app.services.acord.acord_formatter import AcordFormatter
 
 
 class AcordExtractionPipeline:

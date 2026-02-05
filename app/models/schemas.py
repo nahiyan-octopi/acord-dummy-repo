@@ -70,7 +70,7 @@ class HealthResponse(BaseModel):
     status: str
     message: str
     version: str
-    groq_api: Optional[bool] = None
+    openai_api: Optional[bool] = None
     upload_folder: Optional[bool] = None
     output_folder: Optional[bool] = None
 

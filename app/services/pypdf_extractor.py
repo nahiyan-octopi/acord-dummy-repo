@@ -114,7 +114,7 @@ def extract_form_fields(pdf_path: str | Path) -> Dict[str, Any]:
 
 def _clean_field_name(field_name: str) -> str:
     """
-    Clean up PDF form field name by removing common prefixes.
+    Clean up PDF form field name by removing common prefixes and suffixes.
     
     Args:
         field_name: Raw field name from PDF
@@ -130,9 +130,9 @@ def _clean_field_name(field_name: str) -> str:
     elif cleaned.startswith('F[0].'):
         cleaned = cleaned[5:]
     
-    # Remove trailing [0] array indices while preserving meaningful ones
-    # e.g., "FieldName[0]" -> "FieldName" but keep "Insurer_A[0]" intact for context
-    if cleaned.endswith('[0]') and not any(c in cleaned for c in ['_A', '_B', '_C', '_D', '_E', '_F']):
+    # Remove trailing [0] array indices from all field names
+    # The field name already ends with _A, _B, etc. to indicate the instance
+    if cleaned.endswith('[0]'):
         cleaned = cleaned[:-3]
     
     return cleaned

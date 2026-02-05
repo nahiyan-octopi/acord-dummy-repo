@@ -8,7 +8,7 @@ from pathlib import Path
 from datetime import datetime
 from typing import Tuple, Dict, Any
 from starlette.datastructures import UploadFile
-from backend.config import Config
+from app.config import Config
 
 
 async def save_upload_file(file: UploadFile) -> Tuple[bool, str]:

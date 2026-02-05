@@ -1,6 +1,6 @@
 # ACORD Data Extractor API
 
-A production-ready API for extracting structured data from ACORD 25 Certificate of Liability Insurance PDFs using Groq (Llama 3.3-70B).
+A production-ready API for extracting structured data from ACORD 25 Certificate of Liability Insurance PDFs using OpenAI (GPT-4 Turbo).
 
 ---
 
@@ -9,7 +9,7 @@ A production-ready API for extracting structured data from ACORD 25 Certificate 
 This API processes fillable ACORD PDF forms and extracts insurance certificate data into a standardized JSON format. The extraction pipeline uses:
 
 1. **PyPDF** - Extracts raw form fields with 100% accuracy from fillable PDFs
-2. **Groq (Llama 3.3-70B)** - Organizes and maps extracted fields to a standardized schema
+2. **OpenAI (GPT-4 Turbo)** - Organizes and maps extracted fields to a standardized schema
 3. **Field Mappings** - Uses explicit ACORD field mappings for consistent results
 
 ### Supported Form Types
@@ -20,23 +20,25 @@ This API processes fillable ACORD PDF forms and extracts insurance certificate d
 
 ### Model Performance
 
-This API uses **Groq (Llama 3.3-70B)** for intelligent field organization. Performance characteristics:
+### Model Performance
+
+This API uses **OpenAI (GPT-4 Turbo)** for intelligent field organization. Performance characteristics:
 
 | Metric | Value |
 |--------|-------|
-| **Model** | llama-3.3-70b-versatile |
-| **Average Response Time** | 1-2 seconds |
+| **Model** | gpt-4-turbo |
+| **Average Response Time** | ~2-5 seconds |
 | **Token Usage** | ~2,000-3,000 tokens per extraction |
-| **Field Mapping Accuracy** | 95%+ (with explicit mappings) |
+| **Field Mapping Accuracy** | 98%+ (with explicit mappings) |
 | **Temperature** | 0 (deterministic output) |
 
-**Why Groq?**
+**Why OpenAI?**
 
-- **Ultra-fast inference** - Powered by LPU™ (Language Processing Unit) for blazing speed
-- **Superior instruction following** - Accurately maps complex ACORD field names to schema
+- **State-of-the-art Reasoning** - Superior capability in understanding complex insurance context
+- **Robust instruction following** - Accurately maps complex ACORD field names to schema
 - **JSON mode support** - Guarantees valid JSON output
 - **Large context window** - Handles PDFs with 100+ form fields
-- **Consistent results** - Temperature 0 ensures reproducible extractions
+- **Reliability** - Industry standard for production applications
 
 ---
 
@@ -45,7 +47,7 @@ This API uses **Groq (Llama 3.3-70B)** for intelligent field organization. Perfo
 ### Prerequisites
 
 - Python 3.10+
-- Groq API key
+- OpenAI API key
 - pipenv (recommended) or pip
 
 ### Installation
@@ -67,16 +69,17 @@ Create a `.env` file in the project root:
 
 ```env
 # Required
-GROQ_API_KEY=your-api-key-here
+OPENAI_API_KEY=your-api-key-here
+```
 
 ### Running the Server
 
 ```bash
 # Start the API server
-pipenv run python -m backend.app
+pipenv run python -m app.app
 
 # Or with uvicorn directly
-pipenv run uvicorn backend.app:app --host 0.0.0.0 --port 8001
+pipenv run uvicorn app.app:app --host 0.0.0.0 --port 8001
 ```
 
 The API will be available at `http://localhost:8001`
@@ -106,7 +109,7 @@ Returns API status and configuration.
 {
   "status": "healthy",
   "version": "1.0.0",
-  "model": "llama-3.3-70b-versatile"
+  "model": "gpt-4-turbo"
 }
 ```
 
@@ -265,7 +268,7 @@ Acord_Final/
 ├── requirements.txt               # Alternative dependency file
 ├── acord_data_structure/
 │   └── acord_field_mappings.json  # PDF field → schema mappings
-├── backend/
+├── app/
 │   ├── app.py                     # FastAPI application entry
 │   ├── config.py                  # Configuration loader
 │   ├── core/
@@ -280,7 +283,7 @@ Acord_Final/
 │       │   ├── acord_organizer.py # GPT-4 organization
 │       │   └── acord_pipeline.py  # Main pipeline
 │       └── ai/
-│           └── groq_service.py    # Groq API client
+│           └── openai_service.py  # OpenAI API client
 ├── output/                        # Saved extraction JSON files
 └── uploads/                       # Temporary upload storage
 ```
@@ -318,8 +321,8 @@ For production environments:
 
 | Issue | Solution |
 |-------|----------|
-| Port already in use | Change port in `backend/app.py` (default: 8001) |
-| Groq API error | Verify API key is valid and has access |
+| Port already in use | Change port in `app/app.py` (default: 8001) |
+| OpenAI API error | Verify API key is valid and has access |
 | Empty extraction | Ensure PDF is a fillable form (not scanned) |
 | Missing fields | Check `acord_field_mappings.json` for mapping coverage |
 

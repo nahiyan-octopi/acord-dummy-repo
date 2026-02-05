@@ -12,11 +12,11 @@ load_dotenv()
 class Config:
     """Base configuration class"""
     
-    # Groq API Configuration
-    GROQ_API_KEY = os.getenv('GROQ_API_KEY')
-    GROQ_MODEL = os.getenv('GROQ_MODEL', 'llama-3.1-8b-instant')
-    GROQ_TEMPERATURE = float(os.getenv('GROQ_TEMPERATURE', 0))
-    GROQ_MAX_TOKENS = int(os.getenv('GROQ_MAX_TOKENS', 4096))
+    # OpenAI API Configuration
+    OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
+    OPENAI_MODEL = os.getenv('OPENAI_MODEL', 'gpt-4-turbo')
+    OPENAI_TEMPERATURE = float(os.getenv('OPENAI_TEMPERATURE', 0))
+    OPENAI_MAX_TOKENS = int(os.getenv('OPENAI_MAX_TOKENS', 4096))
     
     # Application Configuration
     DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
@@ -58,7 +58,7 @@ class Config:
     
     @classmethod
     def validate_api_key(cls):
-        """Validate that Groq API key is configured"""
-        if not cls.GROQ_API_KEY:
-            raise ValueError("GROQ_API_KEY is not set in environment variables")
+        """Validate that OpenAI API key is configured"""
+        if not cls.OPENAI_API_KEY:
+            raise ValueError("OPENAI_API_KEY is not set in environment variables")
         return True

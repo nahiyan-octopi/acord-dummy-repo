@@ -1,7 +1,7 @@
 """
 ACORD Data Organizer
 
-Uses Groq Llama to organize extracted PDF form fields into a standardized schema.
+Uses OpenAI to organize extracted PDF form fields into a standardized schema.
 Provides explicit field mappings to ensure accurate classification.
 """
 
@@ -9,11 +9,11 @@ import json
 from pathlib import Path
 from typing import Dict, Any, Optional
 
-from backend.services.ai.groq_service import get_groq_service
+from app.services.ai.openai_service import get_openai_service
 
 
 class AcordOrganizer:
-    """Organizes extracted ACORD form data using Groq Llama with explicit mappings"""
+    """Organizes extracted ACORD form data using OpenAI with explicit mappings"""
     
     def __init__(self, mappings_path: Optional[str] = None):
         """
@@ -28,7 +28,7 @@ class AcordOrganizer:
         
         self.mappings_path = Path(mappings_path)
         self.mappings_data = self._load_mappings()
-        self.groq_service = get_groq_service()
+        self.openai_service = get_openai_service()
     
     def _load_mappings(self) -> Dict[str, Any]:
         """Load field mappings from JSON file"""
@@ -45,7 +45,7 @@ class AcordOrganizer:
     
     def organize(self, raw_fields: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Organize raw extracted fields into standardized schema using Groq.
+        Organize raw extracted fields into standardized schema using OpenAI.
         
         Args:
             raw_fields: Dictionary of raw PDF field names and values
@@ -64,8 +64,8 @@ class AcordOrganizer:
         prompt = self._build_prompt(raw_fields)
         
         try:
-            # Call Groq API
-            response = self.groq_service.chat_completion(
+            # Call OpenAI API
+            response = self.openai_service.chat_completion(
                 messages=[
                     {
                         "role": "system",
@@ -105,13 +105,13 @@ class AcordOrganizer:
     
     def _build_prompt(self, raw_fields: Dict[str, Any]) -> str:
         """
-        Build the prompt for Groq with target schema and mappings.
+        Build the prompt for OpenAI with target schema and mappings.
         
         Args:
             raw_fields: Dictionary of raw PDF field names and values
             
         Returns:
-            Prompt string for Groq
+            Prompt string for OpenAI
         """
         target_schema = self.mappings_data.get("targetSchema", {})
         field_mappings = self.mappings_data.get("fieldMappings", {})
@@ -144,11 +144,21 @@ RAW EXTRACTED DATA FROM PDF (ALL fields extracted):
 CRITICAL INSTRUCTIONS FOR COMPLETE EXTRACTION:
 1. Map ALL raw fields to the target schema using the known mappings above
 2. For fields with multiple address components, combine them into a single address string
-3. For checkbox fields, use "Yes" or "No"
+3. For checkbox fields (including "Indicator" fields), use "Yes" or "No"
 4. For missing fields, use null
-5. IMPORTANT: For any field that contains "InsurerLetterCode" or "INSR" or ends with "_LTR", map it to the appropriate insurer_letter field (general_liability.insurer_letter, auto_liability.insurer_letter, umbrella.insurer_letter, or workers_comp.insurer_letter)
-6. IMPORTANT: Add an "unmapped_fields" object containing ANY fields from the raw data that do NOT match any known mapping. Use the original field name as the key.
-7. Return ONLY the JSON object - no explanation or text outside the JSON
+5. IMPORTANT: For any field that contains "InsurerLetterCode" or "INSR" or ends with "_LTR", map it to the appropriate insurer_letter field (general_liability.insurer_letter, auto_liability.insurer_letter, umbrella.insurer_letter, workers_comp.insurer_letter, or other.insurer_letter)
+6. IMPORTANT: For General Liability custom options (CustomOption1_A, CustomOption2_A), extract BOTH the checkbox state AND any associated text value
+7. IMPORTANT: For Auto Liability custom options (CustomOption1_A, CustomOption2_A), extract BOTH the checkbox state AND any associated text value  
+8. IMPORTANT: For General Aggregate Limit Applies Per fields, map them to:
+   - general_aggregate_limit_applies_per_policy (POLICY checkbox)
+   - general_aggregate_limit_applies_per_project (PROJECT checkbox)
+   - general_aggregate_limit_applies_per_location (LOC checkbox)
+   - general_aggregate_limit_applies_per_other (OTHER checkbox)
+   - general_aggregate_limit_applies_per_other_value (text value for OTHER)
+9. IMPORTANT: For Auto Liability vehicle options, use the correct field names:
+   - any_auto, owned_autos_only, hired_autos_only, scheduled_autos_only, non_owned_autos_only
+10. IMPORTANT: Add an "unmapped_fields" object containing ANY fields from the raw data that do NOT match any known mapping. Use the original field name as the key.
+11. Return ONLY the JSON object - no explanation or text outside the JSON
 
 The output JSON must include ALL data from the PDF. Do not discard any information.
 
@@ -158,10 +168,10 @@ Return the complete organized JSON now:"""
     
     def _parse_response(self, response: str) -> Dict[str, Any]:
         """
-        Parse Groq response to extract JSON.
+        Parse OpenAI response to extract JSON.
         
         Args:
-            response: Raw response from Groq
+            response: Raw response from OpenAI
             
         Returns:
             Parsed JSON dictionary

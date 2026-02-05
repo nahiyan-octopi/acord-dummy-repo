@@ -103,9 +103,15 @@ def format_for_tabs(organized_data: Dict[str, Any]) -> Dict[str, Any]:
             "policy_options": {
                 "claims_made": format_checkbox(gl.get("claims_made")),
                 "occurrence": format_checkbox(gl.get("occurrence")),
-                "aggregate_applies_policy": format_checkbox(gl.get("policy")),
-                "aggregate_applies_project": format_checkbox(gl.get("project")),
-                "aggregate_applies_location": format_checkbox(gl.get("loc"))
+                "custom_option_1": format_checkbox(gl.get("custom_option_1")),
+                "custom_option_1_value": gl.get("custom_option_1_value"),
+                "custom_option_2": format_checkbox(gl.get("custom_option_2")),
+                "custom_option_2_value": gl.get("custom_option_2_value"),
+                "aggregate_applies_policy": format_checkbox(gl.get("general_aggregate_limit_applies_per_policy")),
+                "aggregate_applies_project": format_checkbox(gl.get("general_aggregate_limit_applies_per_project")),
+                "aggregate_applies_location": format_checkbox(gl.get("general_aggregate_limit_applies_per_location")),
+                "aggregate_applies_other": format_checkbox(gl.get("general_aggregate_limit_applies_per_other")),
+                "aggregate_applies_other_value": gl.get("general_aggregate_limit_applies_per_other_value")
             },
             "policy_limits": {
                 "each_occurrence": format_limit(gl.get("each_occurrence")),
@@ -127,10 +133,14 @@ def format_for_tabs(organized_data: Dict[str, Any]) -> Dict[str, Any]:
             },
             "policy_options": {
                 "any_auto": format_checkbox(auto.get("any_auto")),
-                "allowed_autos": format_checkbox(auto.get("all_owned")),  
-                "scheduled_autos": format_checkbox(auto.get("scheduled")),
-                "hired_autos": format_checkbox(auto.get("hired")),
-                "non_owned_autos": format_checkbox(auto.get("non_owned"))
+                "owned_autos_only": format_checkbox(auto.get("owned_autos_only")),
+                "hired_autos_only": format_checkbox(auto.get("hired_autos_only")),
+                "scheduled_autos_only": format_checkbox(auto.get("scheduled_autos_only")),
+                "non_owned_autos_only": format_checkbox(auto.get("non_owned_autos_only")),
+                "custom_option_1": format_checkbox(auto.get("custom_option_1")),
+                "custom_option_1_value": auto.get("custom_option_1_value"),
+                "custom_option_2": format_checkbox(auto.get("custom_option_2")),
+                "custom_option_2_value": auto.get("custom_option_2_value")
             },
             "policy_limits": {
                 "combined_single_limit": format_limit(auto.get("combined_single_limit")),
@@ -173,12 +183,12 @@ def format_for_tabs(organized_data: Dict[str, Any]) -> Dict[str, Any]:
                 "subrogation_waived": format_checkbox(wc.get("subrogation_waived"))
             },
             "policy_options": {
-                "any_officers_excluded": format_checkbox(wc.get("any_excluded")),
-                "other": format_checkbox(wc.get("other"))
+                "per_statute": format_checkbox(wc.get("per_statute")),
+                "other": format_checkbox(wc.get("other")),
+                "any_officers_excluded": format_checkbox(wc.get("any_excluded"))
             },
             "policy_limits": {
-                "per_statute": format_checkbox(wc.get("per_statute")),
-                "per_statute_other_limit": format_limit(wc.get("each_accident")),  # Map specific limit
+                "per_statute_other_limit": format_limit(wc.get("per_statute_other_limit")),
                 "each_accident": format_limit(wc.get("each_accident")),
                 "each_employee": format_limit(wc.get("disease_each_employee")),
                 "disease_policy_limit": format_limit(wc.get("disease_policy_limit"))
@@ -192,12 +202,13 @@ def format_for_tabs(organized_data: Dict[str, Any]) -> Dict[str, Any]:
                 "effective_date": other.get("effective_date"),
                 "expiration_date": other.get("expiration_date"),
                 "additional_insured": format_checkbox(other.get("addl")),
-                "subrogation_waived": format_checkbox(other.get("subr"))
+                "subrogation_waived": format_checkbox(other.get("subr")),
+                "description": other.get("description")
              },
              "policy_limits": [
-                {"First Policy Option": other.get("first_policy_option"), "First Policy Limit": format_limit(other.get("first_policy_limit"))},
-                {"Second Policy Option": other.get("second_policy_option"), "Second Policy Limit": format_limit(other.get("second_policy_limit"))},
-                {"Third Policy Option": other.get("third_policy_option"), "Third Policy Limit": format_limit(other.get("third_policy_limit"))}
+                {"policy_option": other.get("first_policy_option"), "policy_limit": format_limit(other.get("first_policy_limit"))},
+                {"policy_option": other.get("second_policy_option"), "policy_limit": format_limit(other.get("second_policy_limit"))},
+                {"policy_option": other.get("third_policy_option"), "policy_limit": format_limit(other.get("third_policy_limit"))}
              ]
         },
         "notes": organized_data.get("remarks") if organized_data.get("remarks") else None,
