@@ -1,72 +1,61 @@
 """
 ACORD Data Organizer
 
-Uses OpenAI to organize extracted PDF form fields into a standardized schema.
-Provides explicit field mappings to ensure accurate classification.
+Uses OpenAI GPT to organize ONLY unformatted/supplementary data 
+(insured, producer, certificate holder, insurers).
+
+Coverage sections are handled by direct_mapper.py without AI.
 """
 
 import json
-from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 
 from app.services.ai.openai_service import get_openai_service
 
 
 class AcordOrganizer:
-    """Organizes extracted ACORD form data using OpenAI with explicit mappings"""
+    """
+    Organizes unformatted ACORD form data using AI with guidance-based prompts.
+    Only processes supplementary data (contacts, addresses, insurers).
+    Coverage data is handled by DirectMapper.
+    """
     
-    def __init__(self, mappings_path: Optional[str] = None):
-        """
-        Initialize organizer with field mappings.
-        
-        Args:
-            mappings_path: Path to acord_field_mappings.json
-        """
-        if mappings_path is None:
-            # Default to acord_data_structure folder
-            mappings_path = Path(__file__).parent.parent.parent.parent / "acord_data_structure" / "acord_field_mappings.json"
-        
-        self.mappings_path = Path(mappings_path)
-        self.mappings_data = self._load_mappings()
+    def __init__(self):
+        """Initialize organizer."""
         self.openai_service = get_openai_service()
     
-    def _load_mappings(self) -> Dict[str, Any]:
-        """Load field mappings from JSON file"""
-        try:
-            if self.mappings_path.exists():
-                with open(self.mappings_path, 'r', encoding='utf-8') as f:
-                    return json.load(f)
-            else:
-                print(f"Warning: Mappings file not found at {self.mappings_path}")
-                return {}
-        except Exception as e:
-            print(f"Error loading mappings: {e}")
-            return {}
-    
-    def organize(self, raw_fields: Dict[str, Any]) -> Dict[str, Any]:
+    def organize_unformatted(self, unmapped_fields: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Organize raw extracted fields into standardized schema using OpenAI.
+        Organize unformatted/supplementary fields using AI with guidance.
         
         Args:
-            raw_fields: Dictionary of raw PDF field names and values
+            unmapped_fields: Dictionary of PDF fields not consumed by direct mapper
             
         Returns:
-            Organized data matching target schema
+            AI-structured data for unformatted sections
         """
-        if not raw_fields:
+        if not unmapped_fields:
             return {
-                "success": False,
-                "error": "No fields to organize",
-                "organized_data": {}
+                "success": True,
+                "unformatted_data": {}
             }
         
-        # Build the prompt with mappings
-        prompt = self._build_prompt(raw_fields)
+        # Build guidance-based prompt
+        prompt = self._build_guidance_prompt(unmapped_fields)
         
         try:
-            # Call OpenAI API with minimal overhead
+            # Call OpenAI API
             response = self.openai_service.chat_completion(
-                messages=[{"role": "user", "content": prompt}],
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "You are an expert at organizing insurance form contact and entity data. Return ONLY valid JSON."
+                    },
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ],
                 temperature=0,
                 response_format={"type": "json_object"}
             )
@@ -75,78 +64,52 @@ class AcordOrganizer:
                 return {
                     "success": False,
                     "error": response.get("error", "API call failed"),
-                    "organized_data": {}
+                    "unformatted_data": {}
                 }
             
             # Parse the response
-            organized_data = self._parse_response(response.get("content", ""))
+            unformatted_data = self._parse_response(response.get("content", ""))
             
             return {
                 "success": True,
-                "organized_data": organized_data
+                "unformatted_data": unformatted_data,
+                "tokens_used": response.get("usage", {})
             }
             
         except Exception as e:
-            print(f"Error organizing data: {e}")
+            print(f"Error organizing unformatted data: {e}")
             return {
                 "success": False,
                 "error": str(e),
-                "organized_data": {}
+                "unformatted_data": {}
             }
     
-    def _build_prompt(self, raw_fields: Dict[str, Any]) -> str:
-        """
-        Build a compact prompt for OpenAI.
+    def _build_guidance_prompt(self, unmapped_fields: Dict[str, Any]) -> str:
+        """Build a concise prompt for fast AI processing."""
+        # Build compact raw data
+        items = [f'"{k}":"{v}"' for k, v in unmapped_fields.items() 
+                 if v is not None and str(v).strip()]
+        raw_data = "{" + ",".join(items) + "}"
         
-        Args:
-            raw_fields: Dictionary of raw PDF field names and values
-            
-        Returns:
-            Prompt string for OpenAI
-        """
-        field_mappings = self.mappings_data.get("fieldMappings", {})
-        
-        # Match extracted fields to mappings (case-insensitive)
-        raw_field_names_lower = {k.lower(): k for k in raw_fields.keys()}
-        
-        # Build data with schema paths
-        mapped_data = []
-        unmapped_data = []
-        
-        for key, value in raw_fields.items():
-            if value is None or not str(value).strip():
-                continue
-            
-            # Find mapping for this field
-            schema_path = None
-            for pdf_field, path in field_mappings.items():
-                if pdf_field.lower() == key.lower():
-                    schema_path = path
-                    break
-            
-            if schema_path:
-                mapped_data.append(f'{schema_path}="{value}"')
-            else:
-                unmapped_data.append(f'{key}="{value}"')
-        
-        prompt = f"""Convert to nested JSON. Paths use dots for nesting (e.g. "a.b"="v" becomes {{"a":{{"b":"v"}}}}).
-Checkboxes/Indicators: "Yes"/"No". Combine address lines. insurers is array with letter/name/naic.
+        return f"""Organize ACORD insurance data into JSON:
 
-{chr(10).join(mapped_data)}
+INPUT: {raw_data}
 
-unmapped_fields:
-{chr(10).join(unmapped_data) if unmapped_data else 'none'}
+OUTPUT FORMAT:
+{{"insured":{{"name":"...","address":"..."}},"producer":{{"name":"...","address":"...","contact_person":"...","phone":"...","fax":"...","email":"..."}},"certificate_holder":{{"name":"...","address":"..."}},"insurers":[{{"letter":"A","name":"...","naic":"..."}}],"additional_fields":{{"Human Readable Label":"value"}}}}
 
-JSON only:"""
-
-        return prompt
+RULES:
+1. Combine multi-line addresses into one string
+2. Only include fields with data
+3. Convert field names to Title Case labels in additional_fields (e.g. "OtherPolicy_Code_A" → "Other Policy Code A")
+4. Return ONLY valid JSON"""
     
     def _parse_response(self, response: str) -> Dict[str, Any]:
         """
-        Parse OpenAI response to extract JSON.
+        Parse AI response to extract JSON.
         
         Args:
-            response: Raw response from OpenAI
+            response: Raw response from AI
             
         Returns:
             Parsed JSON dictionary
@@ -154,7 +117,6 @@ JSON only:"""
         if not response:
             return {}
         
-        # Try to extract JSON from the response
         response = response.strip()
         
         # If response starts with ```json, extract the JSON block
@@ -185,16 +147,13 @@ JSON only:"""
         return {}
 
 
-def organize_acord_data(raw_fields: Dict[str, Any], mappings_path: Optional[str] = None) -> Dict[str, Any]:
-    """
-    Convenience function to organize ACORD data.
-    
-    Args:
-        raw_fields: Dictionary of raw PDF field names and values
-        mappings_path: Optional path to field mappings JSON
-        
-    Returns:
-        Organization result with organized_data
-    """
-    organizer = AcordOrganizer(mappings_path)
-    return organizer.organize(raw_fields)
+# Singleton instance
+_acord_organizer = None
+
+
+def get_acord_organizer() -> AcordOrganizer:
+    """Get or create ACORD organizer singleton."""
+    global _acord_organizer
+    if _acord_organizer is None:
+        _acord_organizer = AcordOrganizer()
+    return _acord_organizer

@@ -1,6 +1,4 @@
-"""
-Routes module for ACORD Data Extractor API
-"""
-from .extraction import router as extraction_router
+# Routes module
+from app.routes.index import main_router
 
-__all__ = ['extraction_router']
+__all__ = ["main_router"]

@@ -1,0 +1,20 @@
+{
+    "type": "object",
+    "properties": {
+        "File": {
+            "type": "string",
+            "description": "Path or identifier for the file to be processed. Example: \"myfile.pdf\""
+        },
+        "Content-Type": {
+            "type": "string",
+            "enum": [
+                "application/json"
+            ],
+            "description": "Specifies the media type of the request body."
+        }
+    },
+    "required": [
+        "File"
+    ],
+    "additionalProperties": false
+}

@@ -1,25 +1,27 @@
 """
-ACORD Data Extractor API
+ACORD Data Extractor API - Application Entry Point
 
-Minimal backend API for extracting data from ACORD PDF forms using OpenAI GPT.
+Request Flow:
+    1. Request hits app.py (this file)
+    2. Routes to routes/index.py (route aggregation)
+    3. Routes to routes/[module].py (endpoint definitions)
+    4. Calls modules/[module]/controller (request handling)
+    5. Calls modules/[module]/service (business logic)
 """
-import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 
-from app.config import Config
-from app.routes.extraction import router as extraction_router
-from app.core.keep_alive import start_keep_alive
+from app.config.config import Config
+from app.routes.index import main_router
 
 # Initialize configuration
 Config.init_app()
 
 # Initialize FastAPI app
 app = FastAPI(
-    title="ACORD Data Extractor API",
+    title="DCN Ai",
     version=Config.VERSION,
-    description="ACORD PDF Data Extraction using OpenAI GPT"
+    description="DCN Ai",
 )
 
 # Add CORS middleware
@@ -31,16 +33,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include extraction routes
-app.include_router(extraction_router)
-
-
-@app.on_event("startup")
-async def startup_event():
-    """Start keep-alive pinger on Render deployment."""
-    if os.environ.get('RENDER'):
-        start_keep_alive()
-
+# Include all routes from index
+app.include_router(main_router)
 
 
 @app.get("/")
@@ -50,11 +44,7 @@ async def root():
         "name": Config.APP_NAME,
         "version": Config.VERSION,
         "status": "running",
-        "endpoints": {
-            "extract": "POST /api/extract-acord",
-            "detect": "POST /api/detect-acord",
-            "health": "GET /health"
-        }
+        "message": "Welcome to DCN Ai Backend"
     }
 
 
@@ -63,8 +53,7 @@ async def health_check():
     """Health check endpoint"""
     return {
         "status": "healthy",
-        "version": Config.VERSION,
-        "model": Config.OPENAI_MODEL
+        "version": Config.VERSION
     }
 
 
