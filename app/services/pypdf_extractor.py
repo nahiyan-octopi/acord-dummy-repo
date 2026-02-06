@@ -65,20 +65,16 @@ def extract_form_fields(pdf_path: str | Path) -> Dict[str, Any]:
             # Get field type (/FT) - Tx=Text, Btn=Button/Checkbox, Ch=Choice
             field_type = field_data.get('/FT')
             
-            # Get current value (/V)
+            # Get current value (/V) and appearance state (/AS)
             value = field_data.get('/V')
+            appearance_state = field_data.get('/AS')
             
             # Clean up field name (remove common prefixes like F[0].P1[0].)
             clean_name = _clean_field_name(field_name)
             
             if field_type == '/Btn':
                 # This is a checkbox/button field
-                if value is not None:
-                    value_str = str(value)
-                    is_checked = value_str in ['/1', '/Yes', '/On', '1', 'Yes', 'On', 'true', 'True']
-                    checkboxes[clean_name] = is_checked
-                else:
-                    checkboxes[clean_name] = False
+                checkboxes[clean_name] = _is_checkbox_checked(value, appearance_state)
             else:
                 # Text field or other
                 if value is not None:
@@ -136,6 +132,27 @@ def _clean_field_name(field_name: str) -> str:
         cleaned = cleaned[:-3]
     
     return cleaned
+
+
+def _is_checkbox_checked(value: Any, appearance_state: Any) -> bool:
+    """
+    Determine checkbox state using /V or /AS when /V is missing.
+    """
+    raw_value = value if value is not None else appearance_state
+    if raw_value is None:
+        return False
+
+    value_str = str(raw_value).strip()
+    true_values = {'/1', '/Yes', '/On', '1', 'Yes', 'On', 'true', 'True'}
+    false_values = {'/0', '/No', '/Off', '0', 'No', 'Off', 'false', 'False'}
+
+    if value_str in true_values:
+        return True
+    if value_str in false_values:
+        return False
+
+    # Fallback: treat any non-empty non-Off name as checked
+    return value_str not in {'', 'None', 'null'}
 
 
 def _prepare_for_openai(extraction_result: Dict[str, Any]) -> Dict[str, Any]:

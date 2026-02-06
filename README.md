@@ -1,44 +1,23 @@
 # ACORD Data Extractor API
 
-A production-ready API for extracting structured data from ACORD 25 Certificate of Liability Insurance PDFs using OpenAI (GPT-4 Turbo).
+API for extracting structured data from ACORD 25 Certificate of Liability Insurance PDFs using PyPDF and OpenAI.
 
 ---
 
 ## Overview
 
-This API processes fillable ACORD PDF forms and extracts insurance certificate data into a standardized JSON format. The extraction pipeline uses:
+This API processes fillable ACORD PDFs and returns a standardized JSON response. The pipeline:
 
-1. **PyPDF** - Extracts raw form fields with 100% accuracy from fillable PDFs
-2. **OpenAI (GPT-4 Turbo)** - Organizes and maps extracted fields to a standardized schema
-3. **Field Mappings** - Uses explicit ACORD field mappings for consistent results
+1. **Detects ACORD forms** using field-name patterns.
+2. **Extracts form fields** from fillable PDFs via PyPDF.
+3. **Organizes fields** into a schema using an OpenAI model.
+4. **Formats output** for the UI.
 
-### Supported Form Types
+### Supported Forms
 
-| Form | Description |
-|------|-------------|
+| Form     | Description                        |
+| -------- | ---------------------------------- |
 | ACORD 25 | Certificate of Liability Insurance |
-
-### Model Performance
-
-### Model Performance
-
-This API uses **OpenAI (GPT-4 Turbo)** for intelligent field organization. Performance characteristics:
-
-| Metric | Value |
-|--------|-------|
-| **Model** | gpt-4-turbo |
-| **Average Response Time** | ~2-5 seconds |
-| **Token Usage** | ~2,000-3,000 tokens per extraction |
-| **Field Mapping Accuracy** | 98%+ (with explicit mappings) |
-| **Temperature** | 0 (deterministic output) |
-
-**Why OpenAI?**
-
-- **State-of-the-art Reasoning** - Superior capability in understanding complex insurance context
-- **Robust instruction following** - Accurately maps complex ACORD field names to schema
-- **JSON mode support** - Guarantees valid JSON output
-- **Large context window** - Handles PDFs with 100+ form fields
-- **Reliability** - Industry standard for production applications
 
 ---
 
@@ -53,12 +32,8 @@ This API uses **OpenAI (GPT-4 Turbo)** for intelligent field organization. Perfo
 ### Installation
 
 ```bash
-# Clone and navigate to project
-cd Acord_Final
-
-# Install dependencies
+cd acord-dummy-repo
 pipenv install
-
 # Or with pip
 pip install -r requirements.txt
 ```
@@ -68,21 +43,23 @@ pip install -r requirements.txt
 Create a `.env` file in the project root:
 
 ```env
-# Required
 OPENAI_API_KEY=your-api-key-here
+OPENAI_MODEL=gpt-4-turbo
+OPENAI_TEMPERATURE=0
+OPENAI_MAX_TOKENS=4096
 ```
+
+`OPENAI_MODEL` defaults to `gpt-4-turbo` when not provided.
 
 ### Running the Server
 
 ```bash
-# Start the API server
 pipenv run python -m app.app
-
 # Or with uvicorn directly
 pipenv run uvicorn app.app:app --host 0.0.0.0 --port 8001
 ```
 
-The API will be available at `http://localhost:8001`
+The API will be available at `http://localhost:8001`.
 
 ---
 
@@ -94,41 +71,36 @@ The API will be available at `http://localhost:8001`
 http://localhost:8001
 ```
 
-### Endpoints
-
-#### Health Check
+### Health Check
 
 ```http
 GET /health
 ```
 
-Returns API status and configuration.
-
 **Response:**
+
 ```json
 {
   "status": "healthy",
-  "version": "1.0.0",
-  "model": "gpt-3.5-turbo"
+  "version": "2.0.0",
+  "model": "gpt-4-turbo"
 }
 ```
 
 ---
 
-#### Extract ACORD Data
+### Extract ACORD Data
 
 ```http
 POST /api/extract-acord
 Content-Type: multipart/form-data
 ```
 
-Extracts and organizes data from an ACORD PDF form.
-
 **Request:**
 
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `file` | File | Yes | PDF file (ACORD 25 fillable form) |
+| Parameter | Type | Required | Description                       |
+| --------- | ---- | -------- | --------------------------------- |
+| `file`    | File | Yes      | PDF file (ACORD 25 fillable form) |
 
 **Response:**
 
@@ -154,17 +126,9 @@ Extracts and organizes data from an ACORD PDF form.
         "occurrence": "Yes"
       },
       "policy_limits": {
-        "each_occurrence": "$1,000,000",
-        "general_aggregate": "$2,000,000"
+        "each_occurrence": "1,000,000",
+        "general_aggregate": "2,000,000"
       }
-    },
-    "automobile_liability": { ... },
-    "umbrella_liability": { ... },
-    "workers_comp": { ... },
-    "other_data": {
-      "insured": { "name": "...", "address": "..." },
-      "producer": { "name": "...", "phone": "...", "email": "..." },
-      "certificate_holder": { "name": "...", "address": "..." }
     }
   },
   "file_info": {
@@ -182,27 +146,19 @@ Extracts and organizes data from an ACORD PDF form.
 {
   "success": false,
   "formatted_data": {},
-  "error": "PDF is not a fillable form. Use OCR/AI extraction instead.",
-  "file_info": { ... }
+  "file_info": { "filename": "ACORD25_form.pdf" },
+  "error": "PDF is not a fillable form. Use OCR/AI extraction instead."
 }
 ```
 
 ---
 
-#### Detect ACORD Form
+### Detect ACORD Form
 
 ```http
 POST /api/detect-acord
 Content-Type: multipart/form-data
 ```
-
-Checks if a PDF is a fillable ACORD form without performing full extraction.
-
-**Request:**
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `file` | File | Yes | PDF file to analyze |
 
 **Response:**
 
@@ -211,8 +167,10 @@ Checks if a PDF is a fillable ACORD form without performing full extraction.
   "is_fillable": true,
   "is_acord": true,
   "field_count": 130,
+  "acord_pattern_matches": 9,
   "confidence": "high",
   "detected_form_type": "ACORD 25 - Certificate of Liability Insurance",
+  "matched_patterns": ["NamedInsured", "Producer_"],
   "filename": "ACORD25_form.pdf"
 }
 ```
@@ -248,22 +206,13 @@ curl -X POST "http://localhost:8001/api/extract-acord" \
   -F "file=@acord_form.pdf"
 ```
 
-### Postman
-
-1. Create a new **POST** request to `http://localhost:8001/api/extract-acord`
-2. Go to **Body** → **form-data**
-3. Add key `file` with type **File**
-4. Select your ACORD PDF
-5. Click **Send**
-
 ---
 
 ## Project Structure
 
 ```
-Acord_Final/
+acord-dummy-repo/
 ├── .env                           # API keys (not in version control)
-├── .gitignore                     # Excludes sensitive files
 ├── Pipfile                        # Python dependencies
 ├── requirements.txt               # Alternative dependency file
 ├── acord_data_structure/
@@ -280,7 +229,7 @@ Acord_Final/
 │       ├── acord/
 │       │   ├── acord_detector.py  # Form detection
 │       │   ├── acord_formatter.py # Output formatting
-│       │   ├── acord_organizer.py # GPT-4 organization
+│       │   ├── acord_organizer.py # OpenAI organization
 │       │   └── acord_pipeline.py  # Main pipeline
 │       └── ai/
 │           └── openai_service.py  # OpenAI API client
@@ -290,44 +239,20 @@ Acord_Final/
 
 ---
 
-## Security Considerations
+## Security Notes
 
-### API Keys
-
-- Store API keys in `.env` file only
-- Never hardcode keys in source code
-- Rotate keys periodically
+- Store API keys in `.env` only
+- Do not commit `.env` to version control
 - Use separate keys for development and production
-
-### File Handling
-
-- Uploaded files are automatically cleaned up after processing
-- Files are stored temporarily in `uploads/` directory
-- Output JSON files are saved to `output/` directory
-
-### Production Deployment
-
-For production environments:
-
-1. Use environment variables instead of `.env` files
-2. Enable HTTPS/TLS
-3. Configure proper CORS origins in `config.py`
-4. Add authentication/authorization as needed
-5. Set `FLASK_DEBUG=False`
+- Configure CORS origins in `app/config.py` for production
 
 ---
 
 ## Troubleshooting
 
-| Issue | Solution |
-|-------|----------|
-| Port already in use | Change port in `app/app.py` (default: 8001) |
-| OpenAI API error | Verify API key is valid and has access |
-| Empty extraction | Ensure PDF is a fillable form (not scanned) |
-| Missing fields | Check `acord_field_mappings.json` for mapping coverage |
-
----
-
-## License
-
-Proprietary - Internal Use Only
+| Issue               | Solution                                               |
+| ------------------- | ------------------------------------------------------ |
+| Port already in use | Change port in `app/app.py` (default: 8001)            |
+| OpenAI API error    | Verify API key and model access                        |
+| Empty extraction    | Ensure PDF is fillable (not scanned)                   |
+| Missing fields      | Check `acord_field_mappings.json` for mapping coverage |
