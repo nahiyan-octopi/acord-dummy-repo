@@ -29,8 +29,22 @@ class Config:
     
     # File Configuration
     BASE_DIR = Path(__file__).parent.parent
-    UPLOAD_FOLDER = BASE_DIR.parent / 'uploads'
-    OUTPUT_FOLDER = BASE_DIR.parent / 'output'
+    
+    # Vercel uses /tmp for writable storage (serverless environment)
+    # Check if running on Vercel - check multiple environment variables
+    IS_VERCEL = (
+        os.getenv('VERCEL') == '1' or 
+        os.getenv('VERCEL_ENV') is not None or
+        os.getenv('VERCEL_URL') is not None or
+        '/var/task' in str(Path(__file__).resolve())  # Vercel's serverless path
+    )
+    
+    if IS_VERCEL:
+        UPLOAD_FOLDER = Path('/tmp/uploads')
+        OUTPUT_FOLDER = Path('/tmp/output')
+    else:
+        UPLOAD_FOLDER = BASE_DIR.parent / 'uploads'
+        OUTPUT_FOLDER = BASE_DIR.parent / 'output'
     
     # Maximum file size (50MB)
     MAX_CONTENT_LENGTH = int(os.getenv('MAX_CONTENT_LENGTH', 50 * 1024 * 1024))
@@ -44,8 +58,16 @@ class Config:
     @classmethod
     def init_app(cls):
         """Initialize application folders"""
-        cls.UPLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
-        cls.OUTPUT_FOLDER.mkdir(parents=True, exist_ok=True)
+        try:
+            cls.UPLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
+            cls.OUTPUT_FOLDER.mkdir(parents=True, exist_ok=True)
+        except OSError as e:
+            # On Vercel, /tmp folders are created on-demand
+            # If we can't create them now, they'll be created when needed
+            if cls.IS_VERCEL:
+                pass  # Expected in serverless - /tmp folders auto-create on first use
+            else:
+                raise e  # Re-raise if not on Vercel
     
     @classmethod
     def validate_api_key(cls):
