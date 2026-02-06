@@ -1,15 +1,44 @@
 {
-    "installCommand": "pip install -r requirements.txt --break-system-packages",
+    "version": 2,
     "builds": [
         {
-            "src": "api/index.py",
+            "src": "app/app.py",
             "use": "@vercel/python"
         }
     ],
-    "routes": [
+    "rewrites": [
         {
-            "src": "/(.*)",
-            "dest": "api/index.py"
+            "source": "/(.*)",
+            "destination": "/app/app"
+        }
+    ],
+    "env": {
+        "PYTHONPATH": ".",
+        "ENVIRONMENT": "production"
+    },
+    "functions": {
+        "app/app.py": {
+            "maxDuration": 60,
+            "memory": 3008
+        }
+    },
+    "headers": [
+        {
+            "source": "/api/(.*)",
+            "headers": [
+                {
+                    "key": "Access-Control-Allow-Origin",
+                    "value": "*"
+                },
+                {
+                    "key": "Access-Control-Allow-Methods",
+                    "value": "GET, POST, PUT, DELETE, OPTIONS"
+                },
+                {
+                    "key": "Access-Control-Allow-Headers",
+                    "value": "Content-Type, Authorization"
+                }
+            ]
         }
     ]
 }
