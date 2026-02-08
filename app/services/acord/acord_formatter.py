@@ -61,7 +61,8 @@ def format_for_tabs(organized_data: Dict[str, Any]) -> Dict[str, Any]:
         "information": {
             "certificate_date": organized_data.get("issue_date"),
             "certificate_number": organized_data.get("certificate_number"),
-            "description_of_operations": organized_data.get("remarks")
+            "description_of_operations": organized_data.get("remarks"),
+            "certificate_holder": organized_data.get("certificate_holder")
         },
         "general_liability": {
             "policy_information": {

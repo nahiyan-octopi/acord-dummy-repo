@@ -35,6 +35,7 @@ class DirectMapper:
         self.coverage_prefixes = [
             "issue_date",
             "certificate_number",
+            "certificate_holder",
             "general_liability.",
             "auto_liability.",
             "umbrella.",
@@ -136,6 +137,10 @@ class DirectMapper:
         return {
             "issue_date": None,
             "certificate_number": None,
+            "certificate_holder": {
+                "name": None,
+                "address": None
+            },
             "general_liability": {
                 "insurer_letter": None,
                 "policy_number": None,
@@ -247,7 +252,7 @@ class DirectMapper:
         current = data
         
         for key in keys[:-1]:
-            if key not in current:
+            if key not in current or current[key] is None or not isinstance(current[key], dict):
                 current[key] = {}
             current = current[key]
         
