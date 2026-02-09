@@ -87,9 +87,9 @@ class AcordOrganizer:
     def _build_guidance_prompt(self, unmapped_fields: Dict[str, Any]) -> str:
         """Build a concise prompt for fast AI processing."""
         # Build compact raw data
-        items = [f'"{k}": "{str(v).strip()}"' for k, v in unmapped_fields.items() 
+        items = [f'"{k}":"{v}"' for k, v in unmapped_fields.items() 
                  if v is not None and str(v).strip()]
-        raw_data = "{" + ", ".join(items) + "}"
+        raw_data = "{" + ",".join(items) + "}"
         
         return f"""Organize ACORD insurance data into JSON:
 
