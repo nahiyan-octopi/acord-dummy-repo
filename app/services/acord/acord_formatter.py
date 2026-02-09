@@ -62,7 +62,8 @@ def format_for_tabs(organized_data: Dict[str, Any]) -> Dict[str, Any]:
             "certificate_date": organized_data.get("issue_date"),
             "certificate_number": organized_data.get("certificate_number"),
             "description_of_operations": organized_data.get("remarks"),
-            "certificate_holder": organized_data.get("certificate_holder")
+            "certificate_holder": organized_data.get("certificate_holder"),
+            "authorized_representative": organized_data.get("authorized_representative")
         },
         "general_liability": {
             "policy_information": {
@@ -74,6 +75,7 @@ def format_for_tabs(organized_data: Dict[str, Any]) -> Dict[str, Any]:
                 "subrogation_waived": format_checkbox(gl.get("subrogation_waived"))
             },
             "policy_options": {
+                "general_liability_coverage_indicator": format_checkbox(gl.get("general_liability_coverage_indicator")),
                 "claims_made": format_checkbox(gl.get("claims_made")),
                 "occurrence": format_checkbox(gl.get("occurrence")),
                 "custom_option_1": format_checkbox(gl.get("custom_option_1")),
