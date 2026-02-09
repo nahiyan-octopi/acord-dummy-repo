@@ -146,6 +146,7 @@ class DirectMapper:
                 "policy_number": None,
                 "effective_date": None,
                 "expiration_date": None,
+                "general_liability_coverage_indicator": None,
                 "claims_made": None,
                 "occurrence": None,
                 "custom_option_1": None,
@@ -258,7 +259,16 @@ class DirectMapper:
         
         # Set the final value
         final_key = keys[-1]
-        current[final_key] = value
+        
+        # If the field already has a value and we're setting it again,
+        # concatenate for address fields (multi-line addresses)
+        if final_key == 'address' and current.get(final_key):
+            existing = current[final_key]
+            if value and str(value).strip():
+                # Combine with existing value, separated by space or newline
+                current[final_key] = f"{existing}, {value}"
+        else:
+            current[final_key] = value
     
     def _normalize_checkboxes(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """
