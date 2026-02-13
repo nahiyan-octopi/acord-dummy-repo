@@ -6,14 +6,15 @@ A high-performance API for extracting structured data from PDF documents using a
 
 ## ✨ Key Features
 
-| Feature | Description |
-|---------|-------------|
-| ⚡ **Hybrid Extraction** | 85% direct mapping (instant) + 15% AI (intelligent structuring) |
-| 🎯 **Smart Detection** | Automatically detects ACORD forms vs general documents |
-| 🚀 **Ultra-Fast** | ~3-5 seconds total (vs 10-12s traditional AI-only) |
-| 🧠 **AI-Powered** | GPT-4o/GPT-4o-mini for unformatted data organization |
-| 📊 **Structured Output** | Clean, tabbed JSON ready for UI consumption |
-| 💰 **Cost-Efficient** | 70% fewer tokens vs full AI extraction |
+| Feature                          | Description                                                     |
+| -------------------------------- | --------------------------------------------------------------- |
+| ⚡ **Hybrid Extraction**         | 85% direct mapping (instant) + 15% AI (intelligent structuring) |
+| 🎯 **Smart Detection**           | Automatically detects ACORD forms vs general documents          |
+| 🚀 **Ultra-Fast**                | ~3-5 seconds total (vs 10-12s traditional AI-only)              |
+| 🧠 **AI-Powered**                | GPT-4o/GPT-4o-mini for unformatted data organization            |
+| 🧬 **Generic Vectorization API** | Fetch text by ID from DB, vectorize, and index in OpenSearch    |
+| 📊 **Structured Output**         | Clean, tabbed JSON ready for UI consumption                     |
+| 💰 **Cost-Efficient**            | 70% fewer tokens vs full AI extraction                          |
 
 ---
 
@@ -46,11 +47,13 @@ PDF Upload
 ### Why Hybrid?
 
 **Traditional AI-Only Approach:**
+
 - Sends all 112 fields to AI
 - 10-12 seconds per extraction
 - High token usage ($$$)
 
 **Our Hybrid Approach:**
+
 - Direct maps 85 coverage fields (deterministic, instant)
 - AI only processes 27 unformatted fields (contacts, insurers)
 - 3-5 seconds total
@@ -97,23 +100,27 @@ PDF Upload
 - **OpenAI API Key** (GPT-4o or GPT-4o-mini recommended)
 
 #### For Universal Extraction (OCR):
+
 - [Tesseract OCR](https://github.com/UB-Mannheim/tesseract/wiki)
 - [Poppler](https://github.com/oschwartz10612/poppler-windows/releases) (Windows)
 
 ### Setup Steps
 
 1. **Clone the repository**
+
    ```bash
    git clone <repository-url>
    cd DCN-Ai
    ```
 
 2. **Create environment file**
+
    ```bash
    cp .env.example .env
    ```
-   
+
    **Edit `.env` and set:**
+
    ```env
    OPENAI_API_KEY=your-api-key-here
    OPENAI_MODEL=gpt-4o-mini
@@ -121,10 +128,11 @@ PDF Upload
    ```
 
 3. **Install dependencies**
+
    ```bash
    # Using Pipenv (recommended)
    pipenv install
-   
+
    # Or using pip
    pip install -r requirements.txt
    ```
@@ -145,10 +153,10 @@ The API will be available at: `http://localhost:8001`
 
 ### Interactive Documentation
 
-| Interface | URL |
-|-----------|-----|
-| **Swagger UI** | http://localhost:8001/docs |
-| **ReDoc** | http://localhost:8001/redoc |
+| Interface      | URL                         |
+| -------------- | --------------------------- |
+| **Swagger UI** | http://localhost:8001/docs  |
+| **ReDoc**      | http://localhost:8001/redoc |
 
 ---
 
@@ -156,19 +164,90 @@ The API will be available at: `http://localhost:8001`
 
 ### Base Endpoints
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/` | API information and status |
-| `GET` | `/health` | Health check endpoint |
+| Method | Endpoint  | Description                |
+| ------ | --------- | -------------------------- |
+| `GET`  | `/`       | API information and status |
+| `GET`  | `/health` | Health check endpoint      |
 
 ### Extraction Endpoints
 
-| Method | Endpoint | Description | Status |
-|--------|----------|-------------|--------|
-| `POST` | `/api/extract-data` | **Unified extraction** - auto-detects & routes | ✅ Primary |
-| `POST` | `/api/detect-acord` | Detect if PDF is fillable ACORD form | ✅ Active |
-| `POST` | `/api/extract` | Legacy endpoint (deprecated) | ⚠️ Use `/api/extract-data` |
-| `POST` | `/api/extract-acord` | Legacy endpoint (deprecated) | ⚠️ Use `/api/extract-data` |
+| Method | Endpoint             | Description                                    | Status                     |
+| ------ | -------------------- | ---------------------------------------------- | -------------------------- |
+| `POST` | `/api/extract-data`  | **Unified extraction** - auto-detects & routes | ✅ Primary                 |
+| `POST` | `/api/detect-acord`  | Detect if PDF is fillable ACORD form           | ✅ Active                  |
+| `POST` | `/api/extract`       | Legacy endpoint (deprecated)                   | ⚠️ Use `/api/extract-data` |
+| `POST` | `/api/extract-acord` | Legacy endpoint (deprecated)                   | ⚠️ Use `/api/extract-data` |
+
+### Vectorization Endpoint
+
+| Method | Endpoint         | Description                                  | Status    |
+| ------ | ---------------- | -------------------------------------------- | --------- |
+| `POST` | `/api/vectorize` | By-ID DB fetch + vectorization to OpenSearch | ✅ Active |
+
+---
+
+## ✅ API Usage (Body Guide)
+
+This section shows exactly what to send in each API request body.
+
+### 1) `GET /`
+
+- Content-Type: none
+- Body: none
+
+### 2) `GET /health`
+
+- Content-Type: none
+- Body: none
+
+### 3) `POST /api/extract-data`
+
+- Content-Type: `multipart/form-data`
+- Body: file upload with key `file` **or** `File`
+
+```bash
+curl -X POST "http://localhost:8001/api/extract-data" \
+  -F "file=@your-document.pdf"
+```
+
+### 4) `POST /api/detect-acord`
+
+- Content-Type: `multipart/form-data`
+- Body: file upload with key `file` **or** `File`
+
+```bash
+curl -X POST "http://localhost:8001/api/detect-acord" \
+  -F "file=@your-document.pdf"
+```
+
+### 5) `POST /api/extract` (deprecated)
+
+- Content-Type: `multipart/form-data`
+- Body: same as `/api/extract-data`
+
+### 6) `POST /api/extract-acord` (deprecated)
+
+- Content-Type: `multipart/form-data`
+- Body: same as `/api/extract-data`
+
+### 7) `POST /api/vectorize`
+
+- Content-Type: `application/json`
+- Body (IDs only, text fetched from DB):
+
+```json
+{
+  "ids": [101, 102, 103],
+  "db": {
+    "connection_string": "mssql+pyodbc://@SERVER/DB?driver=ODBC+Driver+17+for+SQL+Server&Trusted_Connection=yes&TrustServerCertificate=yes",
+    "table_name": "document_content",
+    "id_column": "document_id",
+    "text_column": "text_content"
+  },
+  "index_name": "generic_vectors",
+  "source": "client-a"
+}
+```
 
 ---
 
@@ -177,6 +256,7 @@ The API will be available at: `http://localhost:8001`
 **Unified extraction endpoint** - automatically detects ACORD forms and routes to the optimal pipeline.
 
 **Request:**
+
 ```bash
 curl -X POST "http://localhost:8001/api/extract-data" \
   -F "file=@your-document.pdf"
@@ -184,14 +264,15 @@ curl -X POST "http://localhost:8001/api/extract-data" \
 
 **Request Configuration:**
 
-| Component | Setting | Description |
-|-----------|---------|-------------|
-| **Method** | `POST` | |
-| **Body Type** | `form-data` | Select `form-data` in Postman |
-| **Key** | `file` | Set type to **File** (not Text) |
-| **Value** | `[Binary PDF]` | Upload your `.pdf` document |
+| Component     | Setting        | Description                     |
+| ------------- | -------------- | ------------------------------- |
+| **Method**    | `POST`         |                                 |
+| **Body Type** | `form-data`    | Select `form-data` in Postman   |
+| **Key**       | `file`         | Set type to **File** (not Text) |
+| **Value**     | `[Binary PDF]` | Upload your `.pdf` document     |
 
 **Success Response (ACORD):**
+
 ```json
 {
   "success": true,
@@ -234,6 +315,7 @@ curl -X POST "http://localhost:8001/api/extract-data" \
 ```
 
 **Error Response:**
+
 ```json
 {
   "success": false,
@@ -248,12 +330,14 @@ curl -X POST "http://localhost:8001/api/extract-data" \
 Detects whether a PDF is a fillable ACORD form without extracting data.
 
 **Request:**
+
 ```bash
 curl -X POST "http://localhost:8001/api/detect-acord" \
   -F "file=@document.pdf"
 ```
 
 **Response:**
+
 ```json
 {
   "is_fillable": true,
@@ -265,26 +349,122 @@ curl -X POST "http://localhost:8001/api/detect-acord" \
 
 ---
 
+### `POST /api/vectorize`
+
+Fetches text rows by ID from your DB, vectorizes the text, and stores embeddings in OpenSearch.
+
+**Request:**
+
+```json
+{
+  "ids": [101, 102, 103],
+  "db": {
+    "connection_string": "mssql+pyodbc://@SERVER/DB?driver=ODBC+Driver+17+for+SQL+Server&Trusted_Connection=yes&TrustServerCertificate=yes",
+    "table_name": "document_content",
+    "id_column": "document_id",
+    "text_column": "text_content"
+  },
+  "index_name": "generic_vectors",
+  "source": "client-a"
+}
+```
+
+**How to set each field (important):**
+
+1. **`ids`**
+
+- Provide row IDs to fetch and vectorize.
+- Supports integers or strings.
+- Must correspond to values in `db.id_column`.
+
+2. **`db.connection_string`**
+
+- SQLAlchemy connection string to your DB.
+- SQL Server (Windows auth):
+
+```text
+mssql+pyodbc://@SERVER/DB?driver=ODBC+Driver+17+for+SQL+Server&Trusted_Connection=yes&TrustServerCertificate=yes
+```
+
+3. **`db.table_name`**
+
+- Source table containing your text rows.
+- Use plain identifier format (letters/numbers/underscore), e.g. `document_content`.
+- Schema-qualified values (like `dbo.document_content`) are not accepted by current validator.
+
+4. **`db.id_column`**
+
+- ID column name in that table.
+- Example: `document_id`.
+
+5. **`db.text_column`**
+
+- Text column used for embedding.
+- Example: `text_content`.
+- Empty/null values are skipped.
+
+6. **`index_name`** (optional)
+
+- Target OpenSearch index.
+- Defaults to `generic_vectors` if omitted.
+
+7. **`source`** (optional)
+
+- Label for origin system/tenant.
+- Example: `"client-a"`.
+
+**Expected table shape example**
+
+```sql
+CREATE TABLE document_content (
+  document_id INT PRIMARY KEY,
+  text_content NVARCHAR(MAX)
+);
+```
+
+**Failure behavior**
+
+- Missing IDs are returned in `missing_ids`
+- If none of the IDs are found, API returns `success: false`
+- Invalid table/column identifier format causes validation error
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "indexed_count": 3,
+  "failed_count": 0,
+  "fetched_count": 3,
+  "missing_ids": [],
+  "index_name": "generic_vectors",
+  "errors": [],
+  "timestamp": "2026-02-13T10:30:00+00:00"
+}
+```
+
+---
+
 ## ⚙️ Configuration
 
 Create a `.env` file with these key variables:
 
-| Variable | Description | Recommended |
-|----------|-------------|-------------|
-| `OPENAI_API_KEY` | Your OpenAI API key | *Required* |
-| `OPENAI_MODEL` | GPT model to use | `gpt-4o-mini` (fast & cheap) or `gpt-4o` (fastest) |
-| `OPENAI_TEMPERATURE` | Model temperature (0-1) | `0` (deterministic) |
-| `OPENAI_MAX_TOKENS` | Maximum response tokens | `2000` |
-| `PDF_DPI` | OCR resolution | `300` |
-| `MAX_PAGES` | Maximum pages to process | `50` |
+| Variable             | Description              | Recommended                                        |
+| -------------------- | ------------------------ | -------------------------------------------------- |
+| `OPENAI_API_KEY`     | Your OpenAI API key      | _Required_                                         |
+| `OPENAI_MODEL`       | GPT model to use         | `gpt-4o-mini` (fast & cheap) or `gpt-4o` (fastest) |
+| `OPENAI_TEMPERATURE` | Model temperature (0-1)  | `0` (deterministic)                                |
+| `OPENAI_MAX_TOKENS`  | Maximum response tokens  | `2000`                                             |
+| `PDF_DPI`            | OCR resolution           | `300`                                              |
+| `MAX_PAGES`          | Maximum pages to process | `50`                                               |
 
 ### Model Comparison
 
-| Model | Speed | Quality | Cost | Best For |
-|-------|-------|---------|------|----------|
-| `gpt-4o` | ⚡⚡⚡ 2-3s | ⭐⭐⭐⭐⭐ | $$$ | Production |
-| `gpt-4o-mini` | ⚡⚡ 3-5s | ⭐⭐⭐⭐ | $ | **Recommended** |
-| `gpt-3.5-turbo` | 🐌 8-11s | ⭐⭐⭐ | $$ | Legacy |
+| Model           | Speed       | Quality    | Cost | Best For        |
+| --------------- | ----------- | ---------- | ---- | --------------- |
+| `gpt-4o`        | ⚡⚡⚡ 2-3s | ⭐⭐⭐⭐⭐ | $$$  | Production      |
+| `gpt-4o-mini`   | ⚡⚡ 3-5s   | ⭐⭐⭐⭐   | $    | **Recommended** |
+| `gpt-3.5-turbo` | 🐌 8-11s    | ⭐⭐⭐     | $$   | Legacy          |
 
 ---
 
@@ -292,15 +472,15 @@ Create a `.env` file with these key variables:
 
 ### Hybrid ACORD Extraction
 
-| Metric | Value |
-|--------|-------|
-| **Total Time** | 3-5 seconds |
-| **Detection** | ~0.2s |
-| **PyPDF Extraction** | ~0.2s |
-| **Direct Mapping** | <0.01s (85 fields) |
-| **AI Organization** | ~3-4s (27 fields) |
-| **Format & Merge** | <0.01s |
-| **Token Usage** | ~1000-1200 tokens |
+| Metric               | Value              |
+| -------------------- | ------------------ |
+| **Total Time**       | 3-5 seconds        |
+| **Detection**        | ~0.2s              |
+| **PyPDF Extraction** | ~0.2s              |
+| **Direct Mapping**   | <0.01s (85 fields) |
+| **AI Organization**  | ~3-4s (27 fields)  |
+| **Format & Merge**   | <0.01s             |
+| **Token Usage**      | ~1000-1200 tokens  |
 
 **Improvement over AI-only:** 60-70% faster, 70% fewer tokens
 
@@ -309,10 +489,12 @@ Create a `.env` file with these key variables:
 ## 📋 Supported Document Types
 
 ### ACORD Forms (Hybrid Pipeline - Optimized)
+
 - ✅ ACORD 25 - Certificate of Liability Insurance
 - ✅ Other fillable ACORD forms with form fields
 
 ### Universal Documents (AI Pipeline)
+
 - Resumes / CVs
 - Invoices
 - Contracts
@@ -324,13 +506,17 @@ Create a `.env` file with these key variables:
 ## 🔧 How It Works: Hybrid Extraction
 
 ### 1. **Detection** (0.2s)
+
 Checks if PDF is a fillable ACORD form using PyPDF
 
 ### 2. **PyPDF Extraction** (0.2s)
+
 Extracts all 112 form fields with 100% accuracy
 
 ### 3. **Direct Mapping** (<0.01s)
+
 Uses `acord_field_mappings.json` to instantly map:
+
 - General Liability coverage
 - Auto Liability coverage
 - Umbrella/Excess coverage
@@ -341,7 +527,9 @@ Uses `acord_field_mappings.json` to instantly map:
 **85 fields mapped deterministically - no AI needed!**
 
 ### 4. **AI Organization** (3-4s)
+
 AI processes only unmapped fields:
+
 - Insured name & address
 - Producer/agent details
 - Certificate holder
@@ -351,6 +539,7 @@ AI processes only unmapped fields:
 **Only 27 fields sent to AI - fast & cost-effective!**
 
 ### 5. **Merge & Format** (<0.01s)
+
 Combines direct-mapped coverage data with AI-organized contacts into final JSON structure
 
 ---
@@ -360,18 +549,40 @@ Combines direct-mapped coverage data with AI-organized contacts into final JSON 
 ```json
 {
   "formatted_data": {
-    "information": { /* cert date, number, description */ },
-    "general_liability": { /* policy info, options, limits */ },
-    "automobile_liability": { /* auto coverage details */ },
-    "umbrella_liability": { /* umbrella coverage */ },
-    "workers_comp": { /* workers comp coverage */ },
-    "other_coverage": { /* other policies */ },
+    "information": {
+      /* cert date, number, description */
+    },
+    "general_liability": {
+      /* policy info, options, limits */
+    },
+    "automobile_liability": {
+      /* auto coverage details */
+    },
+    "umbrella_liability": {
+      /* umbrella coverage */
+    },
+    "workers_comp": {
+      /* workers comp coverage */
+    },
+    "other_coverage": {
+      /* other policies */
+    },
     "unformatted_data": {
-      "insured": { /* AI-structured */ },
-      "producer": { /* AI-structured */ },
-      "certificate_holder": { /* AI-structured */ },
-      "insurers": [ /* AI-structured */ ],
-      "additional_fields": { /* Unexpected fields with human-readable labels */ }
+      "insured": {
+        /* AI-structured */
+      },
+      "producer": {
+        /* AI-structured */
+      },
+      "certificate_holder": {
+        /* AI-structured */
+      },
+      "insurers": [
+        /* AI-structured */
+      ],
+      "additional_fields": {
+        /* Unexpected fields with human-readable labels */
+      }
     }
   }
 }

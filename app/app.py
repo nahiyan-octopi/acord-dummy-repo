@@ -44,7 +44,13 @@ async def root():
         "name": Config.APP_NAME,
         "version": Config.VERSION,
         "status": "running",
-        "message": "Welcome to DCN Ai Backend"
+        "message": "Welcome to DCN Ai Backend",
+        "endpoints": {
+            "extract": "POST /api/extract-data",
+            "detect": "POST /api/detect-acord",
+            "vectorize": "POST /api/vectorize",
+            "health": "GET /health"
+        }
     }
 
 

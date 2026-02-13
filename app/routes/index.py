@@ -7,10 +7,12 @@ Request path: app.py → index.py → modules/[module]/routes.py → controller 
 from fastapi import APIRouter
 
 from app.modules.extraction.routes import router as extraction_router
+from app.modules.vectorize.routes import router as vectorize_router
 
 # Main router aggregates all sub-routers from modules
 main_router = APIRouter()
 main_router.include_router(extraction_router)
+main_router.include_router(vectorize_router)
 
 
 # =============================================================================
@@ -24,6 +26,10 @@ main_router.include_router(extraction_router)
 # │
 # └── POST /api/detect-acord - Detect if PDF is ACORD form
 #     └── modules/extraction/routes.py → controller → service
+#
+# VECTORIZER MODULE (/api)
+# └── POST /api/vectorize - Generic text/json vectorization
+#     └── modules/vectorize/routes.py → controller → service
 #
 # ROOT ENDPOINTS (/)
 # ├── GET /         → app.py
