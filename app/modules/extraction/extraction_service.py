@@ -75,12 +75,14 @@ class ExtractionService:
                 print("Using ACORD hybrid extraction pipeline")
                 result = self.acord_pipeline.process(file_path)
                 document_type = "ACORD Form"
+                certificate_type = None
                 extraction_method = "acord_hybrid"
             else:
                 # Use universal extraction
                 print("Using Universal AI extraction pipeline")
                 result = await self.universal_extractor.extract_pdf(str(file_path))
                 document_type = result.get("document_type", "Document")
+                certificate_type = result.get("certificate_type")
                 extraction_method = "universal_ai"
             
             if not result.get("success"):
@@ -93,8 +95,9 @@ class ExtractionService:
             # Prepare extraction result
             extraction_result = {
                 "success": True,
-                "formatted_data": result.get("formatted_data", {}),
                 "document_type": document_type,
+                "certificate_type": certificate_type,
+                "formatted_data": result.get("formatted_data", {}),
                 "extraction_method": extraction_method,
                 "tokens_used": result.get("tokens_used"),
                 "file_info": file_info,

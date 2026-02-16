@@ -46,9 +46,7 @@ async def root():
         "status": "running",
         "message": "Welcome to DCN Ai Backend",
         "endpoints": {
-            "extract": "POST /api/extract-data",
-            "detect": "POST /api/detect-acord",
-            "vectorize": "POST /api/vectorize",
+            "extract": "POST /api/extract",
             "health": "GET /health"
         }
     }

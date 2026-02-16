@@ -87,6 +87,7 @@ class APIResponse:
         document_type: str,
         extraction_method: str,
         file_info: Dict[str, Any],
+        certificate_type: Optional[str] = None,
         tokens_used: Dict[str, Any] = None,
         model: str = None,
         json_file: str = None
@@ -99,6 +100,7 @@ class APIResponse:
             document_type: Type of document processed
             extraction_method: Method used for extraction
             file_info: File information
+            certificate_type: Certificate subtype when document_type is Certificate (optional)
             tokens_used: Token usage information (optional)
             model: Model used (optional)
             json_file: Generated JSON file name (optional)
@@ -107,8 +109,9 @@ class APIResponse:
             JSONResponse with extraction-specific format
         """
         data = {
-            "formatted_data": formatted_data,
             "document_type": document_type,
+            "certificate_type": certificate_type,
+            "formatted_data": formatted_data,
             "extraction_method": extraction_method
         }
         

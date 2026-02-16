@@ -71,6 +71,7 @@ class ExtractionController:
                 formatted_data=result.get("formatted_data", {}),
                 file_info=result.get("file_info", {}),
                 document_type=result.get("document_type", "Document"),
+                certificate_type=result.get("certificate_type"),
                 extraction_method=result.get("extraction_method", "unknown"),
                 tokens_used=result.get("tokens_used"),
                 json_file=result.get("json_file")

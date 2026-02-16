@@ -6,15 +6,14 @@ A high-performance API for extracting structured data from PDF documents using a
 
 ## ✨ Key Features
 
-| Feature                          | Description                                                     |
-| -------------------------------- | --------------------------------------------------------------- |
-| ⚡ **Hybrid Extraction**         | 85% direct mapping (instant) + 15% AI (intelligent structuring) |
-| 🎯 **Smart Detection**           | Automatically detects ACORD forms vs general documents          |
-| 🚀 **Ultra-Fast**                | ~3-5 seconds total (vs 10-12s traditional AI-only)              |
-| 🧠 **AI-Powered**                | GPT-4o/GPT-4o-mini for unformatted data organization            |
-| 🧬 **Generic Vectorization API** | Fetch text by ID from DB, vectorize, and index in OpenSearch    |
-| 📊 **Structured Output**         | Clean, tabbed JSON ready for UI consumption                     |
-| 💰 **Cost-Efficient**            | 70% fewer tokens vs full AI extraction                          |
+| Feature                  | Description                                                     |
+| ------------------------ | --------------------------------------------------------------- |
+| ⚡ **Hybrid Extraction** | 85% direct mapping (instant) + 15% AI (intelligent structuring) |
+| 🎯 **Smart Detection**   | Automatically detects ACORD forms vs general documents          |
+| 🚀 **Ultra-Fast**        | ~3-5 seconds total (vs 10-12s traditional AI-only)              |
+| 🧠 **AI-Powered**        | GPT-4o/GPT-4o-mini for unformatted data organization            |
+| 📊 **Structured Output** | Clean, tabbed JSON ready for UI consumption                     |
+| 💰 **Cost-Efficient**    | 70% fewer tokens vs full AI extraction                          |
 
 ---
 
@@ -169,20 +168,12 @@ The API will be available at: `http://localhost:8001`
 | `GET`  | `/`       | API information and status |
 | `GET`  | `/health` | Health check endpoint      |
 
-### Extraction Endpoints
+### API Endpoints
 
-| Method | Endpoint             | Description                                    | Status                     |
-| ------ | -------------------- | ---------------------------------------------- | -------------------------- |
-| `POST` | `/api/extract-data`  | **Unified extraction** - auto-detects & routes | ✅ Primary                 |
-| `POST` | `/api/detect-acord`  | Detect if PDF is fillable ACORD form           | ✅ Active                  |
-| `POST` | `/api/extract`       | Legacy endpoint (deprecated)                   | ⚠️ Use `/api/extract-data` |
-| `POST` | `/api/extract-acord` | Legacy endpoint (deprecated)                   | ⚠️ Use `/api/extract-data` |
-
-### Vectorization Endpoint
-
-| Method | Endpoint         | Description                                  | Status    |
-| ------ | ---------------- | -------------------------------------------- | --------- |
-| `POST` | `/api/vectorize` | By-ID DB fetch + vectorization to OpenSearch | ✅ Active |
+| Method | Endpoint              | Description                         | Status     |
+| ------ | --------------------- | ----------------------------------- | ---------- |
+| `POST` | `/api/extract`        | **Extract data** from PDF documents | ✅ Primary |
+| `GET`  | `/db/test-connection` | Test database connection            | ✅ Active  |
 
 ---
 
@@ -230,28 +221,9 @@ curl -X POST "http://localhost:8001/api/detect-acord" \
 - Content-Type: `multipart/form-data`
 - Body: same as `/api/extract-data`
 
-### 7) `POST /api/vectorize`
-
-- Content-Type: `application/json`
-- Body (IDs only, text fetched from DB):
-
-```json
-{
-  "ids": [101, 102, 103],
-  "db": {
-    "connection_string": "mssql+pyodbc://@SERVER/DB?driver=ODBC+Driver+17+for+SQL+Server&Trusted_Connection=yes&TrustServerCertificate=yes",
-    "table_name": "document_content",
-    "id_column": "document_id",
-    "text_column": "text_content"
-  },
-  "index_name": "generic_vectors",
-  "source": "client-a"
-}
-```
-
 ---
 
-### `POST /api/extract-data`
+### `POST /api/extract`
 
 **Unified extraction endpoint** - automatically detects ACORD forms and routes to the optimal pipeline.
 
@@ -344,102 +316,6 @@ curl -X POST "http://localhost:8001/api/detect-acord" \
   "is_acord": true,
   "confidence": "high",
   "form_type": "ACORD 25"
-}
-```
-
----
-
-### `POST /api/vectorize`
-
-Fetches text rows by ID from your DB, vectorizes the text, and stores embeddings in OpenSearch.
-
-**Request:**
-
-```json
-{
-  "ids": [101, 102, 103],
-  "db": {
-    "connection_string": "mssql+pyodbc://@SERVER/DB?driver=ODBC+Driver+17+for+SQL+Server&Trusted_Connection=yes&TrustServerCertificate=yes",
-    "table_name": "document_content",
-    "id_column": "document_id",
-    "text_column": "text_content"
-  },
-  "index_name": "generic_vectors",
-  "source": "client-a"
-}
-```
-
-**How to set each field (important):**
-
-1. **`ids`**
-
-- Provide row IDs to fetch and vectorize.
-- Supports integers or strings.
-- Must correspond to values in `db.id_column`.
-
-2. **`db.connection_string`**
-
-- SQLAlchemy connection string to your DB.
-- SQL Server (Windows auth):
-
-```text
-mssql+pyodbc://@SERVER/DB?driver=ODBC+Driver+17+for+SQL+Server&Trusted_Connection=yes&TrustServerCertificate=yes
-```
-
-3. **`db.table_name`**
-
-- Source table containing your text rows.
-- Use plain identifier format (letters/numbers/underscore), e.g. `document_content`.
-- Schema-qualified values (like `dbo.document_content`) are not accepted by current validator.
-
-4. **`db.id_column`**
-
-- ID column name in that table.
-- Example: `document_id`.
-
-5. **`db.text_column`**
-
-- Text column used for embedding.
-- Example: `text_content`.
-- Empty/null values are skipped.
-
-6. **`index_name`** (optional)
-
-- Target OpenSearch index.
-- Defaults to `generic_vectors` if omitted.
-
-7. **`source`** (optional)
-
-- Label for origin system/tenant.
-- Example: `"client-a"`.
-
-**Expected table shape example**
-
-```sql
-CREATE TABLE document_content (
-  document_id INT PRIMARY KEY,
-  text_content NVARCHAR(MAX)
-);
-```
-
-**Failure behavior**
-
-- Missing IDs are returned in `missing_ids`
-- If none of the IDs are found, API returns `success: false`
-- Invalid table/column identifier format causes validation error
-
-**Response:**
-
-```json
-{
-  "success": true,
-  "indexed_count": 3,
-  "failed_count": 0,
-  "fetched_count": 3,
-  "missing_ids": [],
-  "index_name": "generic_vectors",
-  "errors": [],
-  "timestamp": "2026-02-13T10:30:00+00:00"
 }
 ```
 

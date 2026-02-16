@@ -172,7 +172,7 @@ class UniversalPDFExtractor:
                     ai_context += f"{clean_name}: {status}\n"
                 ai_context += "\n"
             
-            print(f"Sending {len(ai_context)} characters to GPT-4-turbo...")
+            print(f"Sending {len(ai_context)} characters to GPT-4o...")
             
             # Use OpenAI to extract and organize data
             ai_result = self.openai_service.extract_universal_data(ai_context)
@@ -183,8 +183,9 @@ class UniversalPDFExtractor:
                     print("AI extraction failed, falling back to raw form fields")
                     return {
                         "success": True,
-                        "formatted_data": form_fields,
                         "document_type": "Unknown",
+                        "certificate_type": None,
+                        "formatted_data": form_fields,
                         "extraction_method": "form_fields_only"
                     }
                 return ai_result
@@ -195,18 +196,24 @@ class UniversalPDFExtractor:
             if isinstance(ai_data, dict):
                 extracted_data = ai_data.get("sections", {})
                 document_type = ai_data.get("document_type", "Document")
+                certificate_type = ai_data.get("certificate_type")
+                is_certificate = isinstance(document_type, str) and document_type.strip().lower() == "certificate"
+                if not is_certificate:
+                    certificate_type = None
                 
                 if not extracted_data and ai_data:
                     extracted_data = {k: v for k, v in ai_data.items() 
-                                    if k not in ["document_type", "success", "error"]}
+                                    if k not in ["document_type", "certificate_type", "success", "error"]}
             else:
                 extracted_data = ai_data if ai_data else {}
                 document_type = "Document"
+                certificate_type = None
             
             return {
                 "success": True,
-                "formatted_data": extracted_data,
                 "document_type": document_type,
+                "certificate_type": certificate_type,
+                "formatted_data": extracted_data,
                 "tokens_used": ai_result.get("usage", {}),
                 "model": self.config.OPENAI_MODEL,
                 "extraction_method": "universal_ai",

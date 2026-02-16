@@ -155,9 +155,9 @@ def get_all_field_names(pdf_path: str | Path) -> list:
     return []
 
 
-def extract_for_llama(pdf_path: str | Path) -> Dict[str, Any]:
+def extract_for_structured_processing(pdf_path: str | Path) -> Dict[str, Any]:
     """
-    Extract form fields in a format ready for Llama processing.
+    Extract form fields in a format ready for structured processing.
     
     Combines text fields and checkboxes into a single dict,
     converting checkbox booleans to "Yes"/"No" strings.
@@ -166,7 +166,7 @@ def extract_for_llama(pdf_path: str | Path) -> Dict[str, Any]:
         pdf_path: Path to PDF file
         
     Returns:
-        Dictionary ready to send to Llama for organization
+        Dictionary ready to send for organization
     """
     result = extract_form_fields(pdf_path)
     

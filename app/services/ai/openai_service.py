@@ -1,5 +1,5 @@
 """
-OpenAI API Service for GPT-4-turbo
+OpenAI API Service for GPT-4o
 """
 import json
 from typing import Optional, Dict, Any
@@ -8,7 +8,7 @@ from app.config.config import Config
 
 
 class OpenAIService:
-    """Service for interacting with OpenAI API (GPT-4-turbo)"""
+    """Service for interacting with OpenAI API (GPT-4o)"""
     
     def __init__(self, api_key: Optional[str] = None):
         """
@@ -35,7 +35,7 @@ class OpenAIService:
         response_format: Optional[Dict] = None
     ) -> Dict[str, Any]:
         """
-        Generate a chat completion using GPT-4-turbo
+        Generate a chat completion using GPT-4o
         
         Args:
             messages: List of message dicts with 'role' and 'content'
@@ -106,7 +106,7 @@ class OpenAIService:
     
     def extract_universal_data(self, document_text: str) -> Dict[str, Any]:
         """
-        Extract structured data from any document using GPT-4-turbo.
+        Extract structured data from any document using GPT-4o.
         
         Args:
             document_text: Text extracted from PDF
@@ -119,9 +119,15 @@ class OpenAIService:
 DOCUMENT TEXT:
 {document_text}
 
-STEP 1: First, identify the document type (Resume, Invoice, Contract, Form, Report, Letter, etc.)
+STEP 1: First, identify the document type (Certificate, Resume, Invoice, Contract, Form, Report, Letter, etc.)
 
 STEP 2: Extract ALL data and organize into SECTIONS appropriate for that document type.
+
+STEP 3: If the document is a certificate, identify the certificate type.
+Examples of certificate type: Kosher, Halal, Non-GMO, Organic, etc.
+
+STEP 4: If the document is a certificate, identify the certificate name and relevant details.
+
 
 DOCUMENT-TYPE SPECIFIC SECTIONS:
 - For RESUME/CV: Contact Information, Summary, Skills, Experience, Education, Projects, Certifications
@@ -129,10 +135,13 @@ DOCUMENT-TYPE SPECIFIC SECTIONS:
 - For FORM: Form Information, Applicant Details, and form-specific sections based on content
 - For CONTRACT: Parties, Terms, Dates, Obligations, Signatures
 - For REPORT: Title, Author, Date, Executive Summary, Findings, Recommendations
+- For Certificate: Certificate Name, Issuer, Recipient, Issue Date, Expiry Date, Details
 
 Return JSON with this EXACT structure:
 {{
     "document_type": "The identified document type",
+    "certificate_type": "Certificate subtype if document_type is Certificate, otherwise null",
+    "certificate_name": "If applicable, the name of the certificate",
     "sections": {{
         "Section Name 1": {{
             "field_name": "value",
@@ -154,7 +163,8 @@ CRITICAL RULES:
 3. Group related information together in logical sections
 4. Use clean, human-readable field names
 5. For lists (skills, experience), use arrays within the appropriate section
-6. Return ONLY valid JSON"""
+6. If document_type is not Certificate, set certificate_type to null
+7. Return ONLY valid JSON"""
         
         try:
             response = self.client.chat.completions.create(
