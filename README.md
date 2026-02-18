@@ -6,15 +6,15 @@ A high-performance API for extracting structured data from PDF documents using a
 
 ## ✨ Key Features
 
-| Feature                          | Description                                                     |
-| -------------------------------- | --------------------------------------------------------------- |
-| ⚡ **Hybrid Extraction**         | 85% direct mapping (instant) + 15% AI (intelligent structuring) |
-| 🎯 **Smart Detection**           | Automatically detects ACORD forms vs general documents          |
-| 🚀 **Ultra-Fast**                | ~3-5 seconds total (vs 10-12s traditional AI-only)              |
-| 🧠 **AI-Powered**                | GPT-4o/GPT-4o-mini for unformatted data organization            |
-| 🧬 **Generic Vectorization API** | Fetch text by ID from DB, vectorize, and index in OpenSearch    |
-| 📊 **Structured Output**         | Clean, tabbed JSON ready for UI consumption                     |
-| 💰 **Cost-Efficient**            | 70% fewer tokens vs full AI extraction                          |
+| Feature                  | Description                                                       |
+| ------------------------ | ----------------------------------------------------------------- |
+| ⚡ **Hybrid Extraction** | 85% direct mapping (instant) + 15% AI (intelligent structuring)   |
+| 🎯 **Smart Detection**   | Automatically detects ACORD forms vs general documents            |
+| 🚀 **Ultra-Fast**        | ~3-5 seconds total (vs 10-12s traditional AI-only)                |
+| 🧠 **AI-Powered**        | GPT-4o/GPT-4o-mini for unformatted data organization              |
+| 🧬 **Vectorization API** | Vectorize uploaded PDFs into chunk embeddings + vectorize queries |
+| 📊 **Structured Output** | Clean, tabbed JSON ready for UI consumption                       |
+| 💰 **Cost-Efficient**    | 70% fewer tokens vs full AI extraction                            |
 
 ---
 
@@ -180,9 +180,10 @@ The API will be available at: `http://localhost:8001`
 
 ### Vectorization Endpoint
 
-| Method | Endpoint         | Description                                  | Status    |
-| ------ | ---------------- | -------------------------------------------- | --------- |
-| `POST` | `/api/vectorize` | By-ID DB fetch + vectorization to OpenSearch | ✅ Active |
+| Method | Endpoint               | Description                                   | Status    |
+| ------ | ---------------------- | --------------------------------------------- | --------- |
+| `POST` | `/api/vectorize`       | Upload single PDF and return chunk embeddings | ✅ Active |
+| `POST` | `/api/vectorize-query` | Vectorize query text for downstream systems   | ✅ Active |
 
 ---
 
@@ -232,20 +233,22 @@ curl -X POST "http://localhost:8001/api/detect-acord" \
 
 ### 7) `POST /api/vectorize`
 
+- Content-Type: `multipart/form-data`
+- Body: file upload with key `file`
+
+```bash
+curl -X POST "http://localhost:8001/api/vectorize" \
+  -F "file=@your-document.pdf"
+```
+
+### 8) `POST /api/vectorize-query`
+
 - Content-Type: `application/json`
-- Body (IDs only, text fetched from DB):
+- Body:
 
 ```json
 {
-  "ids": [101, 102, 103],
-  "db": {
-    "connection_string": "mssql+pyodbc://@SERVER/DB?driver=ODBC+Driver+17+for+SQL+Server&Trusted_Connection=yes&TrustServerCertificate=yes",
-    "table_name": "document_content",
-    "id_column": "document_id",
-    "text_column": "text_content"
-  },
-  "index_name": "generic_vectors",
-  "source": "client-a"
+  "query": "rezwn"
 }
 ```
 
@@ -351,95 +354,86 @@ curl -X POST "http://localhost:8001/api/detect-acord" \
 
 ### `POST /api/vectorize`
 
-Fetches text rows by ID from your DB, vectorizes the text, and stores embeddings in OpenSearch.
+Extracts text from an uploaded PDF, applies chunking, and returns chunk-level embeddings.
 
 **Request:**
 
-```json
-{
-  "ids": [101, 102, 103],
-  "db": {
-    "connection_string": "mssql+pyodbc://@SERVER/DB?driver=ODBC+Driver+17+for+SQL+Server&Trusted_Connection=yes&TrustServerCertificate=yes",
-    "table_name": "document_content",
-    "id_column": "document_id",
-    "text_column": "text_content"
-  },
-  "index_name": "generic_vectors",
-  "source": "client-a"
-}
+```bash
+curl -X POST "http://localhost:8001/api/vectorize" \
+  -F "file=@sample.pdf"
 ```
 
-**How to set each field (important):**
+**Chunking behavior**
 
-1. **`ids`**
-
-- Provide row IDs to fetch and vectorize.
-- Supports integers or strings.
-- Must correspond to values in `db.id_column`.
-
-2. **`db.connection_string`**
-
-- SQLAlchemy connection string to your DB.
-- SQL Server (Windows auth):
-
-```text
-mssql+pyodbc://@SERVER/DB?driver=ODBC+Driver+17+for+SQL+Server&Trusted_Connection=yes&TrustServerCertificate=yes
-```
-
-3. **`db.table_name`**
-
-- Source table containing your text rows.
-- Use plain identifier format (letters/numbers/underscore), e.g. `document_content`.
-- Schema-qualified values (like `dbo.document_content`) are not accepted by current validator.
-
-4. **`db.id_column`**
-
-- ID column name in that table.
-- Example: `document_id`.
-
-5. **`db.text_column`**
-
-- Text column used for embedding.
-- Example: `text_content`.
-- Empty/null values are skipped.
-
-6. **`index_name`** (optional)
-
-- Target OpenSearch index.
-- Defaults to `generic_vectors` if omitted.
-
-7. **`source`** (optional)
-
-- Label for origin system/tenant.
-- Example: `"client-a"`.
-
-**Expected table shape example**
-
-```sql
-CREATE TABLE document_content (
-  document_id INT PRIMARY KEY,
-  text_content NVARCHAR(MAX)
-);
-```
-
-**Failure behavior**
-
-- Missing IDs are returned in `missing_ids`
-- If none of the IDs are found, API returns `success: false`
-- Invalid table/column identifier format causes validation error
+- `chunk_size = 1200`
+- `chunk_overlap = 150`
+- One output document per chunk with stable fields for downstream storage/search systems.
 
 **Response:**
 
 ```json
 {
   "success": true,
-  "indexed_count": 3,
-  "failed_count": 0,
-  "fetched_count": 3,
-  "missing_ids": [],
-  "index_name": "generic_vectors",
-  "errors": [],
-  "timestamp": "2026-02-13T10:30:00+00:00"
+  "doc_id": "36d3c8f1d6b824f07dff7d2a",
+  "embedding_model": "text-embedding-3-small",
+  "embedding_dimensions": 1024,
+  "chunk_size": 1200,
+  "chunk_overlap": 150,
+  "total_chunks": 3,
+  "embedded_chunks": 3,
+  "failed_chunks": 0,
+  "file_info": {
+    "filename": "sample.pdf",
+    "file_size": 210340
+  },
+  "chunks": [
+    {
+      "doc_id": "36d3c8f1d6b824f07dff7d2a",
+      "chunk_id": "36d3c8f1d6b824f07dff7d2a:0",
+      "chunk_index": 0,
+      "text": "...",
+      "embedding": [0.001, -0.003, "..."],
+      "created_at": "2026-02-18T10:30:00+00:00",
+      "has_embedding": true,
+      "metadata": {
+        "filename": "sample.pdf",
+        "file_size": 210340,
+        "page_count": 3,
+        "extraction_method": "pypdf",
+        "extraction_strategy": "form_fields_plus_page_text",
+        "form_field_count": 128
+      }
+    }
+  ]
+}
+```
+
+---
+
+### `POST /api/vectorize-query`
+
+Generates a query embedding with the same model and dimensions as `/api/vectorize`.
+
+**Request:**
+
+```json
+{
+  "query": "Rezwn"
+}
+```
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "query": "Rezwn",
+  "embedding": [0.001, -0.003, "..."],
+  "embedding_model": "text-embedding-3-small",
+  "embedding_dimensions": 1024,
+  "created_at": "2026-02-18T10:35:00+00:00",
+  "has_embedding": true,
+  "timestamp": "2026-02-18T10:35:00+00:00"
 }
 ```
 

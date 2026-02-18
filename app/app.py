@@ -49,6 +49,7 @@ async def root():
             "extract": "POST /api/extract-data",
             "detect": "POST /api/detect-acord",
             "vectorize": "POST /api/vectorize",
+            "vectorize_query": "POST /api/vectorize-query",
             "health": "GET /health"
         }
     }

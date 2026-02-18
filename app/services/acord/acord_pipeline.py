@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Dict, Any
 
 from app.services.acord.acord_detector import detect_acord_form
-from app.services.pypdf_extractor import extract_for_llama as extract_pdf_fields
+from app.services.pypdf_extractor import extract_form_fields_for_structuring as extract_pdf_fields
 from app.services.acord.direct_mapper import get_direct_mapper
 from app.services.acord.acord_organizer import get_acord_organizer
 from app.services.acord.acord_formatter import AcordFormatter

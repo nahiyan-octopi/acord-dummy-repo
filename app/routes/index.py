@@ -28,7 +28,8 @@ main_router.include_router(vectorize_router)
 #     └── modules/extraction/routes.py → controller → service
 #
 # VECTORIZER MODULE (/api)
-# └── POST /api/vectorize - Generic text/json vectorization
+# ├── POST /api/vectorize - PDF chunk vectorization
+# └── POST /api/vectorize-query - Query text vectorization
 #     └── modules/vectorize/routes.py → controller → service
 #
 # ROOT ENDPOINTS (/)
