@@ -150,6 +150,19 @@ python -m uvicorn app.app:app --reload --port 8001
 
 The API will be available at: `http://localhost:8001`
 
+**Note:** Request logging (method, path, status code, and response time) is automatically enabled and displayed in the terminal output for all API requests.
+
+### Example Terminal Output
+
+```
+INFO:     Started server process [12345]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete. Listening on http://0.0.0.0:8001
+INFO:     Request: POST /api/rules/ - Status: 200 - Duration: 45ms
+INFO:     Request: GET /api/rules/ - Status: 200 - Duration: 12ms
+INFO:     Request: DELETE /api/rules/ - Status: 200 - Duration: 78ms
+```
+
 ### Interactive Documentation
 
 | Interface      | URL                         |
@@ -170,10 +183,18 @@ The API will be available at: `http://localhost:8001`
 
 ### API Endpoints
 
-| Method | Endpoint              | Description                         | Status     |
-| ------ | --------------------- | ----------------------------------- | ---------- |
-| `POST` | `/api/extract`        | **Extract data** from PDF documents | ✅ Primary |
-| `GET`  | `/db/test-connection` | Test database connection            | ✅ Active  |
+| Method   | Endpoint             | Description                                           | Status     |
+| -------- | -------------------- | ----------------------------------------------------- | ---------- |
+| `POST`   | `/api/extract`       | **Extract data** from PDF documents                   | ✅ Primary |
+| `POST`   | `/api/extract-data`  | **Extract data** with modern endpoint                 | ✅ Primary |
+| `POST`   | `/api/validate-data` | **Extract + validate certificate** data against rules | ✅ Active  |
+| `POST`   | `/api/detect-acord`  | **Detect** if document is ACORD form                  | ✅ Primary |
+| `POST`   | `/api/rules/`        | **Create** validation rule(s) - single or bulk        | ✅ Active  |
+| `GET`    | `/api/rules/`        | **List all** validation rules                         | ✅ Active  |
+| `GET`    | `/api/rules/{id}`    | **Get** validation rule by ID                         | ✅ Active  |
+| `PUT`    | `/api/rules/{id}`    | **Update** validation rule                            | ✅ Active  |
+| `DELETE` | `/api/rules/{id}`    | **Delete** validation rule                            | ✅ Active  |
+| `DELETE` | `/api/rules/`        | **Delete** multiple validation rules (bulk)           | ✅ Active  |
 
 ---
 
@@ -211,12 +232,29 @@ curl -X POST "http://localhost:8001/api/detect-acord" \
   -F "file=@your-document.pdf"
 ```
 
-### 5) `POST /api/extract` (deprecated)
+### 5) `POST /api/validate-data`
+
+- Content-Type: `multipart/form-data`
+- Body: file upload with key `file` **or** `File`
+
+```bash
+curl -X POST "http://localhost:8001/api/validate-data" \
+  -F "file=@your-document.pdf"
+```
+
+Validation behavior:
+
+- Only certificate documents are validated
+- Rule match requires both `certificate_type` and `product_name`
+- If both match, `validation_status` is `approved`; otherwise `rejected`
+- Non-certificate documents return: `There's no validation rule for "<document_type>".`
+
+### 6) `POST /api/extract` (deprecated)
 
 - Content-Type: `multipart/form-data`
 - Body: same as `/api/extract-data`
 
-### 6) `POST /api/extract-acord` (deprecated)
+### 7) `POST /api/extract-acord` (deprecated)
 
 - Content-Type: `multipart/form-data`
 - Body: same as `/api/extract-data`
@@ -318,6 +356,358 @@ curl -X POST "http://localhost:8001/api/detect-acord" \
   "form_type": "ACORD 25"
 }
 ```
+
+---
+
+## 🔐 Validation Rules API
+
+Manage validation rules for certificate processing. Rules define which combinations of `certificate_type` and `product_name` are valid.
+
+### Rules Database Schema
+
+```
+Table: validation_rules
+├── id (INT, Primary Key, Auto-increment)
+├── certificate_type (VARCHAR, NOT NULL)
+├── product_name (VARCHAR, NOT NULL)
+└── is_active (BIT, Default: 1)
+```
+
+### `POST /api/rules/` - Create Rule(s)
+
+Create a single validation rule or multiple rules in one request (bulk create with atomic transactions).
+
+**Request - Single Rule:**
+
+```bash
+curl -X POST "http://localhost:8001/api/rules/" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "certificate_type": "ACORD-25",
+    "product_name": "Commercial General Liability",
+    "is_active": true
+  }'
+```
+
+**Request - Bulk Create (Multiple Rules):**
+
+```bash
+curl -X POST "http://localhost:8001/api/rules/" \
+  -H "Content-Type: application/json" \
+  -d '[
+    {
+      "certificate_type": "ACORD-25",
+      "product_name": "Commercial General Liability",
+      "is_active": true
+    },
+    {
+      "certificate_type": "ACORD-25",
+      "product_name": "Workers Compensation",
+      "is_active": true
+    },
+    {
+      "certificate_type": "ACORD-26",
+      "product_name": "Business Auto Liability",
+      "is_active": true
+    }
+  ]'
+```
+
+**Success Response (Single):**
+
+```json
+{
+  "success": true,
+  "message": "Rule created successfully",
+  "data": {
+    "id": 1,
+    "certificate_type": "ACORD-25",
+    "product_name": "Commercial General Liability",
+    "is_active": true
+  }
+}
+```
+
+**Success Response (Bulk):**
+
+```json
+{
+  "success": true,
+  "message": "3 rules created successfully",
+  "data": [
+    {
+      "id": 1,
+      "certificate_type": "ACORD-25",
+      "product_name": "Commercial General Liability",
+      "is_active": true
+    },
+    {
+      "id": 2,
+      "certificate_type": "ACORD-25",
+      "product_name": "Workers Compensation",
+      "is_active": true
+    },
+    {
+      "id": 3,
+      "certificate_type": "ACORD-26",
+      "product_name": "Business Auto Liability",
+      "is_active": true
+    }
+  ]
+}
+```
+
+**Error Response - Duplicate Rule:**
+
+```json
+{
+  "success": false,
+  "error_code": "DUPLICATE_RULE",
+  "message": "Rule already exists: ACORD-25 + Commercial General Liability",
+  "details": "This combination already exists in the database"
+}
+```
+
+**Error Response - Bulk with Duplicates:**
+
+```json
+{
+  "success": false,
+  "error_code": "DUPLICATE_RULES_IN_REQUEST",
+  "message": "Duplicate rules found in request",
+  "details": "Rules at indices 0 and 2 have the same certificate_type and product_name"
+}
+```
+
+### `GET /api/rules/` - List All Rules
+
+Retrieve all validation rules from the database.
+
+**Request:**
+
+```bash
+curl -X GET "http://localhost:8001/api/rules/"
+```
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "message": "Rules retrieved successfully",
+  "count": 3,
+  "data": [
+    {
+      "id": 1,
+      "certificate_type": "ACORD-25",
+      "product_name": "Commercial General Liability",
+      "is_active": true
+    },
+    {
+      "id": 2,
+      "certificate_type": "ACORD-25",
+      "product_name": "Workers Compensation",
+      "is_active": true
+    },
+    {
+      "id": 3,
+      "certificate_type": "ACORD-26",
+      "product_name": "Business Auto Liability",
+      "is_active": true
+    }
+  ]
+}
+```
+
+### `GET /api/rules/{id}` - Get Rule by ID
+
+Retrieve a specific validation rule by its ID.
+
+**Request:**
+
+```bash
+curl -X GET "http://localhost:8001/api/rules/1"
+```
+
+**Success Response:**
+
+```json
+{
+  "success": true,
+  "message": "Rule retrieved successfully",
+  "data": {
+    "id": 1,
+    "certificate_type": "ACORD-25",
+    "product_name": "Commercial General Liability",
+    "is_active": true
+  }
+}
+```
+
+**Error Response - Rule Not Found:**
+
+```json
+{
+  "success": false,
+  "error_code": "NOT_FOUND",
+  "message": "Rule not found",
+  "details": "No rule found with ID 999"
+}
+```
+
+### `PUT /api/rules/{id}` - Update Rule
+
+Update an existing validation rule.
+
+**Request:**
+
+```bash
+curl -X PUT "http://localhost:8001/api/rules/1" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "certificate_type": "ACORD-25",
+    "product_name": "Commercial General Liability - Updated",
+    "is_active": false
+  }'
+```
+
+**Success Response:**
+
+```json
+{
+  "success": true,
+  "message": "Rule updated successfully",
+  "data": {
+    "id": 1,
+    "certificate_type": "ACORD-25",
+    "product_name": "Commercial General Liability - Updated",
+    "is_active": false
+  }
+}
+```
+
+### `DELETE /api/rules/{id}` - Delete Single Rule
+
+Delete a specific validation rule by ID.
+
+**Request:**
+
+```bash
+curl -X DELETE "http://localhost:8001/api/rules/1"
+```
+
+**Success Response:**
+
+```json
+{
+  "success": true,
+  "message": "Rule deleted successfully",
+  "data": {
+    "id": 1,
+    "certificate_type": "ACORD-25",
+    "product_name": "Commercial General Liability",
+    "is_active": true
+  }
+}
+```
+
+### `DELETE /api/rules/` - Delete Multiple Rules (Bulk)
+
+Delete multiple validation rules in one request using an array of IDs (atomic transaction - all or nothing).
+
+**Request:**
+
+```bash
+curl -X DELETE "http://localhost:8001/api/rules/" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "ids": [1, 2, 3]
+  }'
+```
+
+**Success Response:**
+
+```json
+{
+  "success": true,
+  "message": "3 rules deleted successfully",
+  "data": [
+    {
+      "id": 1,
+      "certificate_type": "ACORD-25",
+      "product_name": "Commercial General Liability",
+      "is_active": true
+    },
+    {
+      "id": 2,
+      "certificate_type": "ACORD-25",
+      "product_name": "Workers Compensation",
+      "is_active": true
+    },
+    {
+      "id": 3,
+      "certificate_type": "ACORD-26",
+      "product_name": "Business Auto Liability",
+      "is_active": true
+    }
+  ]
+}
+```
+
+**Error Response - Some IDs Not Found:**
+
+```json
+{
+  "success": false,
+  "error_code": "NOT_FOUND",
+  "message": "Some rules not found",
+  "details": "Rules with IDs [999, 1000] were not found in the database. No deletions were made."
+}
+```
+
+### Request/Response Models
+
+**CreateRuleRequest (Single):**
+
+```typescript
+{
+  "certificate_type": string,    // Certificate type identifier
+  "product_name": string,         // Product/coverage name
+  "is_active": boolean            // Active status (default: true)
+}
+```
+
+**DeleteRulesRequest (Bulk):**
+
+```typescript
+{
+  "ids": number[]                 // Array of rule IDs to delete
+}
+```
+
+### Features
+
+✅ **Single Create** - Create one rule at a time  
+✅ **Bulk Create** - Create multiple rules in one request  
+✅ **Atomic Transactions** - Bulk operations are all-or-nothing (rollback on any error)  
+✅ **Duplicate Detection** - Prevents duplicate rules within request and in database  
+✅ **Get by ID** - Retrieve specific rules quickly  
+✅ **List All** - Get complete rule set  
+✅ **Update** - Modify existing rules  
+✅ **Single Delete** - Remove one rule  
+✅ **Bulk Delete** - Remove multiple rules with atomic transaction  
+✅ **Standardized Errors** - Consistent error codes and messages
+
+### Error Codes
+
+| Code                         | HTTP | Description                              |
+| ---------------------------- | ---- | ---------------------------------------- |
+| `DUPLICATE_RULE`             | 400  | Rule already exists in database          |
+| `DUPLICATE_RULES_IN_REQUEST` | 400  | Duplicate rules found within the request |
+| `NOT_FOUND`                  | 404  | Rule(s) not found                        |
+| `DATABASE_ERROR`             | 500  | Database operation failed                |
+| `INVALID_REQUEST`            | 400  | Invalid request format                   |
+| `INTERNAL_SERVER_ERROR`      | 500  | Unexpected server error                  |
 
 ---
 

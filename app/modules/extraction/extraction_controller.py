@@ -7,7 +7,8 @@ Delegates business logic to extraction service.
 
 from fastapi import UploadFile, BackgroundTasks
 
-from app.modules.extraction.extraction_service import ExtractionService
+from app.services.extraction.extraction_service import ExtractionService
+from app.services.validation.validation_service import ValidationService
 from app.utils.response_utils import APIResponse, validation_error, server_error
 
 
@@ -24,7 +25,8 @@ class ExtractionController:
     
     def __init__(self):
         """Initialize controller with extraction service."""
-        self.service = ExtractionService()
+        self.extraction_service = ExtractionService()
+        self.validation_service = ValidationService(self.extraction_service)
     
     async def extract_data(
         self, 
@@ -56,7 +58,7 @@ class ExtractionController:
         
         try:
             # Call service for extraction
-            result = await self.service.extract_data(file, force_acord=force_acord)
+            result = await self.extraction_service.extract_data(file, force_acord=force_acord)
             
             if not result.get("success"):
                 return server_error(result.get("error", "Extraction failed"))
@@ -108,7 +110,7 @@ class ExtractionController:
         
         try:
             # Call service for detection
-            result = await self.service.detect_acord(file)
+            result = await self.extraction_service.detect_acord(file)
             
             # Schedule file cleanup
             if result.get("file_path"):
@@ -126,3 +128,45 @@ class ExtractionController:
             
         except Exception as e:
             return server_error(f"Detection failed: {str(e)}")
+
+    async def validate_data(
+        self,
+        file: UploadFile,
+        background_tasks: BackgroundTasks
+    ) -> dict:
+        """
+        Validate extracted certificate data against database rules.
+
+        Args:
+            file: Uploaded PDF file
+            background_tasks: FastAPI background tasks for cleanup
+
+        Returns:
+            API response with validation results
+        """
+        if file is None:
+            return validation_error("No file provided. Please upload a PDF file.")
+
+        if not file.filename:
+            return validation_error("Invalid file. Missing filename.")
+
+        if not file.filename.lower().endswith('.pdf'):
+            return validation_error("Invalid file type. Only PDF files are supported.")
+
+        try:
+            result = await self.validation_service.validate_data(file)
+
+            if result.get("file_path"):
+                from app.utils.utils import cleanup_temp_file
+                background_tasks.add_task(cleanup_temp_file, result["file_path"])
+
+            if not result.get("success"):
+                return server_error(result.get("error", "Validation failed"))
+
+            return APIResponse.success(
+                data=result.get("data", {}),
+                message=result.get("message", "Validation completed successfully")
+            )
+
+        except Exception as e:
+            return server_error(f"Validation failed: {str(e)}")

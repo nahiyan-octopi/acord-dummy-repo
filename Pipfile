@@ -16,6 +16,8 @@ pdf2image = ">=1.16.0"
 pytesseract = ">=0.3.10"
 pillow = ">=10.0.0"
 uvicorn = {extras = ["standard"], version = ">=0.23.0"}
+reportlab = "*"
+nltk = "*"
 
 [dev-packages]
 

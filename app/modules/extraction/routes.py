@@ -66,6 +66,24 @@ async def detect_acord(
     return await controller.detect_acord(uploaded_file, background_tasks)
 
 
+@router.post("/validate-data")
+async def validate_data(
+    background_tasks: BackgroundTasks,
+    file: Optional[UploadFile] = File(None),
+    File_param: Optional[UploadFile] = File(None, alias="File")
+):
+    """
+    Extract and validate certificate document data against database rules.
+
+    Flow:
+    - Extract data from uploaded PDF
+    - Persist extraction to documents and document_content tables
+    - Validate certificate_type + product_name against validation_rules
+    """
+    uploaded_file = file if file is not None else File_param
+    return await controller.validate_data(uploaded_file, background_tasks)
+
+
 # Legacy endpoints for backwards compatibility (deprecated)
 @router.post("/extract", deprecated=True)
 async def extract_legacy(
