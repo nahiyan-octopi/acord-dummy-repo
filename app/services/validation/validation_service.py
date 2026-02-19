@@ -9,15 +9,22 @@ Handles document validation workflow:
 
 from typing import Dict, Any
 import json
-import re
 from datetime import datetime
-from difflib import SequenceMatcher
 
 from fastapi import UploadFile
 from nltk.stem.porter import PorterStemmer
 
 from app.config.database_config import db
 from app.services.ai.openai_service import get_openai_service
+from app.services.validation.product_extraction import extract_product_names_from_structure
+from app.services.validation.text_matching import (
+    fuzzy_similarity,
+    normalize_text,
+    normalized_rule_product_candidates,
+    stem_based_overlap_score,
+    stem_tokens,
+    token_overlap_score,
+)
 
 
 class ValidationService:
@@ -287,83 +294,23 @@ class ValidationService:
 
     def _normalize_text(self, value: Any) -> str:
         """Normalize text for case-insensitive and whitespace-insensitive matching."""
-        if value is None:
-            return ""
-        text = str(value).strip().lower()
-        text = text.replace("&", " and ")
-        text = text.replace("+", " and ")
-        text = text.replace("/", " ")
-        text = text.replace("_", " ")
-        text = text.replace("-", " ")
-        text = re.sub(r"\s+", " ", text)
-        text = re.sub(r"[^a-z0-9\s]", "", text)
-        return text.strip()
+        return normalize_text(value)
 
     def _normalized_rule_product_candidates(self, raw_rule_value: Any) -> list[str]:
         """Split a rule row product field into normalized product candidates."""
-        if raw_rule_value is None:
-            return []
-
-        raw_text = str(raw_rule_value).strip()
-        if not raw_text:
-            return []
-
-        split_parts = re.split(r"[,;\n|]+", raw_text)
-
-        normalized_candidates: list[str] = []
-        seen: set[str] = set()
-        for part in split_parts:
-            normalized = self._normalize_text(part)
-            if normalized and normalized not in seen:
-                seen.add(normalized)
-                normalized_candidates.append(normalized)
-
-        if normalized_candidates:
-            return normalized_candidates
-
-        normalized_full = self._normalize_text(raw_text)
-        return [normalized_full] if normalized_full else []
+        return normalized_rule_product_candidates(raw_rule_value)
 
     def _token_overlap_score(self, left: str, right: str) -> float:
         """Compute Jaccard-like token overlap score for fuzzy matching."""
-        left_tokens = {tok for tok in left.split(" ") if tok}
-        right_tokens = {tok for tok in right.split(" ") if tok}
+        return token_overlap_score(left, right, self.MIN_TOKEN_INTERSECTION)
 
-        if not left_tokens or not right_tokens:
-            return 0.0
-
-        intersection = left_tokens.intersection(right_tokens)
-        if len(intersection) < self.MIN_TOKEN_INTERSECTION:
-            return 0.0
-
-        union = left_tokens.union(right_tokens)
-        if not union:
-            return 0.0
-
-        return len(intersection) / len(union)
-
-    def _stem_tokens(self, text: str) -> set:
+    def _stem_tokens(self, text: str) -> set[str]:
         """Convert normalized text to set of stemmed tokens."""
-        tokens = text.split()
-        return {self.stemmer.stem(tok) for tok in tokens if tok}
+        return stem_tokens(text, self.stemmer)
 
     def _stem_based_overlap_score(self, left: str, right: str) -> float:
         """Compute Jaccard similarity on stemmed tokens for morphological matching."""
-        left_stems = self._stem_tokens(left)
-        right_stems = self._stem_tokens(right)
-
-        if not left_stems or not right_stems:
-            return 0.0
-
-        intersection = left_stems.intersection(right_stems)
-        if not intersection:
-            return 0.0
-
-        union = left_stems.union(right_stems)
-        if not union:
-            return 0.0
-
-        return len(intersection) / len(union)
+        return stem_based_overlap_score(left, right, self.stemmer)
 
     def _fuzzy_similarity(self, str1: str, str2: str) -> float:
         """
@@ -373,66 +320,11 @@ class ValidationService:
         Long strings (>10 chars) use 0.80 threshold.
         Returns similarity score (0.0-1.0) if meets threshold, else 0.0.
         """
-        ratio = SequenceMatcher(None, str1, str2).ratio()
-        min_len = min(len(str1), len(str2))
-
-        # Dynamic threshold based on string length
-        if min_len <= 4:
-            threshold = 0.70
-        elif min_len <= 10:
-            threshold = 0.75
-        else:
-            threshold = self.FUZZY_THRESHOLD
-
-        return ratio if ratio >= threshold else 0.0
+        return fuzzy_similarity(str1, str2, self.FUZZY_THRESHOLD)
 
     def _extract_product_names_from_structure(self, payload: Any) -> list[str]:
         """Deterministically walk extracted payload and collect likely product names."""
-        candidates: list[str] = []
-        product_key_hints = {
-            "product",
-            "products",
-            "product_name",
-            "item",
-            "items",
-            "commodity",
-            "commodities",
-            "sku",
-        }
-
-        def walk(value: Any, parent_key: str = ""):
-            if isinstance(value, dict):
-                for key, inner in value.items():
-                    walk(inner, key)
-                return
-
-            if isinstance(value, list):
-                for inner in value:
-                    walk(inner, parent_key)
-                return
-
-            if not isinstance(value, str):
-                return
-
-            cleaned = value.strip()
-            if not cleaned:
-                return
-
-            key_norm = self._normalize_text(parent_key)
-            if any(hint in key_norm for hint in product_key_hints):
-                candidates.append(cleaned)
-
-        walk(payload)
-
-        seen: set[str] = set()
-        unique: list[str] = []
-        for value in candidates:
-            lowered = value.lower().strip()
-            if lowered not in seen:
-                seen.add(lowered)
-                unique.append(value)
-
-        return unique
+        return extract_product_names_from_structure(payload)
 
     def _extract_product_names(self, formatted_data: Dict[str, Any]) -> list[str]:
         """

@@ -6,6 +6,31 @@ Business logic for creating validation rules in SQL Server.
 from typing import Dict, Any
 
 from app.config.database_config import db
+from app.services.rules.rules_normalization import (
+    build_rule_response,
+    normalize_bulk_create_rules,
+    normalize_bulk_update_rules,
+    normalize_rule_fields,
+    normalize_rule_ids,
+)
+from app.services.rules.rules_queries import (
+    BULK_DUPLICATE_CHECK_QUERY,
+    BULK_INSERT_QUERY,
+    BULK_UPDATE_DUPLICATE_QUERY,
+    BULK_UPDATE_QUERY,
+    GET_RULE_QUERY,
+    LIST_RULES_QUERY,
+    SINGLE_DELETE_QUERY,
+    SINGLE_DUPLICATE_QUERY,
+    SINGLE_EXISTS_QUERY,
+    SINGLE_FIND_FOR_DELETE_QUERY,
+    SINGLE_INSERT_QUERY,
+    SINGLE_UPDATE_DUPLICATE_QUERY,
+    SINGLE_UPDATE_QUERY,
+    build_delete_rules_by_ids_query,
+    build_find_rule_ids_query,
+    build_find_rules_by_ids_query,
+)
 
 
 class RulesService:
@@ -21,26 +46,10 @@ class RulesService:
         Returns:
             List of deleted rules
         """
-        if not rule_ids:
-            raise ValueError("At least one rule id is required")
-
-        normalized_ids: list[int] = []
-        seen_ids: set[int] = set()
-        for rule_id in rule_ids:
-            normalized_id = int(rule_id)
-            if normalized_id <= 0:
-                raise ValueError("All rule ids must be positive integers")
-            if normalized_id in seen_ids:
-                raise ValueError(f"Duplicate rule id in request: {normalized_id}")
-            seen_ids.add(normalized_id)
-            normalized_ids.append(normalized_id)
+        normalized_ids = normalize_rule_ids(rule_ids)
 
         placeholders = ",".join(["?"] * len(normalized_ids))
-        find_query = f"""
-        SELECT id, certificate_type, product_name, is_active
-        FROM validation_rules
-        WHERE id IN ({placeholders})
-        """
+        find_query = build_find_rules_by_ids_query(placeholders)
 
         with db.get_connection() as conn:
             cursor = conn.cursor()
@@ -55,7 +64,7 @@ class RulesService:
                 if missing_ids:
                     raise LookupError(f"Rule not found for id(s): {missing_ids}")
 
-                delete_query = f"DELETE FROM validation_rules WHERE id IN ({placeholders})"
+                delete_query = build_delete_rules_by_ids_query(placeholders)
                 cursor.execute(delete_query, tuple(normalized_ids))
                 conn.commit()
             except Exception:
@@ -63,12 +72,12 @@ class RulesService:
                 raise
 
         deleted_by_id = {
-            int(rule["id"]): {
-                "id": int(rule["id"]),
-                "certificate_type": rule["certificate_type"],
-                "product_name": rule["product_name"],
-                "is_active": bool(rule["is_active"]),
-            }
+            int(rule["id"]): build_rule_response(
+                rule_id=int(rule["id"]),
+                certificate_type=rule["certificate_type"],
+                product_name=rule["product_name"],
+                is_active=bool(rule["is_active"]),
+            )
             for rule in found_rules
         }
         return [deleted_by_id[rule_id] for rule_id in normalized_ids]
@@ -83,49 +92,7 @@ class RulesService:
         Returns:
             List of created rules with IDs
         """
-        if not rules:
-            raise ValueError("At least one rule is required")
-
-        normalized_rules: list[Dict[str, Any]] = []
-        seen_pairs: set[tuple[str, str]] = set()
-
-        for rule in rules:
-            certificate_type = str(rule.get("certificate_type", "")).strip()
-            product_name = str(rule.get("product_name", "")).strip()
-            is_active = bool(rule.get("is_active", True))
-
-            if not certificate_type:
-                raise ValueError("certificate_type is required for all rules")
-            if not product_name:
-                raise ValueError("product_name is required for all rules")
-
-            pair_key = (certificate_type.lower(), product_name.lower())
-            if pair_key in seen_pairs:
-                raise ValueError(
-                    f"Duplicate rule in request: certificate_type='{certificate_type}', product_name='{product_name}'"
-                )
-            seen_pairs.add(pair_key)
-
-            normalized_rules.append(
-                {
-                    "certificate_type": certificate_type,
-                    "product_name": product_name,
-                    "is_active": is_active,
-                }
-            )
-
-        duplicate_check_query = """
-        SELECT TOP 1 id
-        FROM validation_rules
-        WHERE LOWER(certificate_type) = LOWER(?)
-          AND LOWER(product_name) = LOWER(?)
-        """
-
-        insert_query = """
-        INSERT INTO validation_rules (certificate_type, product_name, is_active)
-        OUTPUT INSERTED.id
-        VALUES (?, ?, ?)
-        """
+        normalized_rules = normalize_bulk_create_rules(rules)
 
         created_rules: list[Dict[str, Any]] = []
 
@@ -134,7 +101,7 @@ class RulesService:
             try:
                 for rule in normalized_rules:
                     cursor.execute(
-                        duplicate_check_query,
+                        BULK_DUPLICATE_CHECK_QUERY,
                         (rule["certificate_type"], rule["product_name"]),
                     )
                     existing = cursor.fetchone()
@@ -144,7 +111,7 @@ class RulesService:
                         )
 
                     cursor.execute(
-                        insert_query,
+                        BULK_INSERT_QUERY,
                         (
                             rule["certificate_type"],
                             rule["product_name"],
@@ -156,12 +123,12 @@ class RulesService:
                         raise Exception("Failed to create one of the rules")
 
                     created_rules.append(
-                        {
-                            "id": int(inserted[0]),
-                            "certificate_type": rule["certificate_type"],
-                            "product_name": rule["product_name"],
-                            "is_active": bool(rule["is_active"]),
-                        }
+                        build_rule_response(
+                            rule_id=int(inserted[0]),
+                            certificate_type=rule["certificate_type"],
+                            product_name=rule["product_name"],
+                            is_active=bool(rule["is_active"]),
+                        )
                     )
 
                 conn.commit()
@@ -181,68 +148,10 @@ class RulesService:
         Returns:
             List of updated rules with IDs
         """
-        if not rules:
-            raise ValueError("At least one rule is required")
-
-        normalized_rules: list[Dict[str, Any]] = []
-        seen_ids: set[int] = set()
-        seen_pairs: set[tuple[str, str]] = set()
-
-        for rule in rules:
-            rule_id = int(rule.get("id", 0))
-            certificate_type = str(rule.get("certificate_type", "")).strip()
-            product_name = str(rule.get("product_name", "")).strip()
-            is_active = bool(rule.get("is_active", True))
-
-            if rule_id <= 0:
-                raise ValueError("All rule ids must be positive integers")
-            if rule_id in seen_ids:
-                raise ValueError(f"Duplicate rule id in request: {rule_id}")
-            seen_ids.add(rule_id)
-
-            if not certificate_type:
-                raise ValueError("certificate_type is required for all rules")
-            if not product_name:
-                raise ValueError("product_name is required for all rules")
-
-            pair_key = (certificate_type.lower(), product_name.lower())
-            if pair_key in seen_pairs:
-                raise ValueError(
-                    f"Duplicate rule in request: certificate_type='{certificate_type}', product_name='{product_name}'"
-                )
-            seen_pairs.add(pair_key)
-
-            normalized_rules.append(
-                {
-                    "id": rule_id,
-                    "certificate_type": certificate_type,
-                    "product_name": product_name,
-                    "is_active": is_active,
-                }
-            )
+        normalized_rules = normalize_bulk_update_rules(rules)
 
         placeholders = ",".join(["?"] * len(normalized_rules))
-        find_query = f"""
-        SELECT id
-        FROM validation_rules
-        WHERE id IN ({placeholders})
-        """
-
-        duplicate_query = """
-        SELECT TOP 1 id
-        FROM validation_rules
-        WHERE LOWER(certificate_type) = LOWER(?)
-          AND LOWER(product_name) = LOWER(?)
-          AND id <> ?
-        """
-
-        update_query = """
-        UPDATE validation_rules
-        SET certificate_type = ?,
-            product_name = ?,
-            is_active = ?
-        WHERE id = ?
-        """
+        find_query = build_find_rule_ids_query(placeholders)
 
         updated_rules: list[Dict[str, Any]] = []
 
@@ -258,7 +167,7 @@ class RulesService:
 
                 for rule in normalized_rules:
                     cursor.execute(
-                        duplicate_query,
+                        BULK_UPDATE_DUPLICATE_QUERY,
                         (rule["certificate_type"], rule["product_name"], rule["id"])
                     )
                     existing = cursor.fetchone()
@@ -268,7 +177,7 @@ class RulesService:
                         )
 
                     cursor.execute(
-                        update_query,
+                        BULK_UPDATE_QUERY,
                         (
                             rule["certificate_type"],
                             rule["product_name"],
@@ -280,12 +189,12 @@ class RulesService:
                         raise LookupError("Rule not found")
 
                     updated_rules.append(
-                        {
-                            "id": int(rule["id"]),
-                            "certificate_type": rule["certificate_type"],
-                            "product_name": rule["product_name"],
-                            "is_active": bool(rule["is_active"]),
-                        }
+                        build_rule_response(
+                            rule_id=int(rule["id"]),
+                            certificate_type=rule["certificate_type"],
+                            product_name=rule["product_name"],
+                            is_active=bool(rule["is_active"]),
+                        )
                     )
 
                 conn.commit()
@@ -297,31 +206,21 @@ class RulesService:
 
     def get_rule(self, rule_id: int) -> Dict[str, Any]:
         """Return a single validation rule by id."""
-        query = """
-        SELECT TOP 1 id, certificate_type, product_name, is_active
-        FROM validation_rules
-        WHERE id = ?
-        """
-        rows = db.execute_query(query, (rule_id,))
+        rows = db.execute_query(GET_RULE_QUERY, (rule_id,))
         if not rows:
             raise LookupError("Rule not found")
 
         row = rows[0]
-        return {
-            "id": int(row["id"]),
-            "certificate_type": row["certificate_type"],
-            "product_name": row["product_name"],
-            "is_active": bool(row["is_active"])
-        }
+        return build_rule_response(
+            rule_id=int(row["id"]),
+            certificate_type=row["certificate_type"],
+            product_name=row["product_name"],
+            is_active=bool(row["is_active"]),
+        )
 
     def list_rules(self) -> list[Dict[str, Any]]:
         """Return all validation rules ordered by latest first."""
-        query = """
-        SELECT id, certificate_type, product_name, is_active
-        FROM validation_rules
-        ORDER BY id DESC
-        """
-        rows = db.execute_query(query)
+        rows = db.execute_query(LIST_RULES_QUERY)
         for row in rows:
             row["id"] = int(row["id"])
             row["is_active"] = bool(row["is_active"])
@@ -339,43 +238,24 @@ class RulesService:
         Returns:
             Created rule payload
         """
-        normalized_certificate_type = certificate_type.strip()
-        normalized_product_name = product_name.strip()
+        normalized_rule = normalize_rule_fields(certificate_type, product_name, is_active)
 
-        if not normalized_certificate_type:
-            raise ValueError("certificate_type is required")
-
-        if not normalized_product_name:
-            raise ValueError("product_name is required")
-
-        duplicate_query = """
-        SELECT TOP 1 id
-        FROM validation_rules
-        WHERE LOWER(certificate_type) = LOWER(?)
-          AND LOWER(product_name) = LOWER(?)
-        """
         duplicate_rows = db.execute_query(
-            duplicate_query,
-            (normalized_certificate_type, normalized_product_name)
+            SINGLE_DUPLICATE_QUERY,
+            (normalized_rule["certificate_type"], normalized_rule["product_name"])
         )
 
         if duplicate_rows:
             raise ValueError("A rule with the same certificate_type and product_name already exists")
 
-        insert_query = """
-        INSERT INTO validation_rules (certificate_type, product_name, is_active)
-        OUTPUT INSERTED.id
-        VALUES (?, ?, ?)
-        """
-
         with db.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
-                insert_query,
+                SINGLE_INSERT_QUERY,
                 (
-                    normalized_certificate_type,
-                    normalized_product_name,
-                    1 if is_active else 0
+                    normalized_rule["certificate_type"],
+                    normalized_rule["product_name"],
+                    1 if normalized_rule["is_active"] else 0
                 )
             )
             inserted_row = cursor.fetchone()
@@ -384,12 +264,12 @@ class RulesService:
         if not inserted_row:
             raise Exception("Failed to create rule")
 
-        return {
-            "id": int(inserted_row[0]),
-            "certificate_type": normalized_certificate_type,
-            "product_name": normalized_product_name,
-            "is_active": bool(is_active)
-        }
+        return build_rule_response(
+            rule_id=int(inserted_row[0]),
+            certificate_type=normalized_rule["certificate_type"],
+            product_name=normalized_rule["product_name"],
+            is_active=bool(normalized_rule["is_active"]),
+        )
 
     def update_rule(self, rule_id: int, certificate_type: str, product_name: str, is_active: bool) -> Dict[str, Any]:
         """
@@ -404,51 +284,25 @@ class RulesService:
         Returns:
             Updated rule payload
         """
-        normalized_certificate_type = certificate_type.strip()
-        normalized_product_name = product_name.strip()
+        normalized_rule = normalize_rule_fields(certificate_type, product_name, is_active)
 
-        if not normalized_certificate_type:
-            raise ValueError("certificate_type is required")
-
-        if not normalized_product_name:
-            raise ValueError("product_name is required")
-
-        exists_query = """
-        SELECT TOP 1 id
-        FROM validation_rules
-        WHERE id = ?
-        """
-        existing_rule = db.execute_query(exists_query, (rule_id,))
+        existing_rule = db.execute_query(SINGLE_EXISTS_QUERY, (rule_id,))
         if not existing_rule:
             raise LookupError("Rule not found")
 
-        duplicate_query = """
-        SELECT TOP 1 id
-        FROM validation_rules
-        WHERE LOWER(certificate_type) = LOWER(?)
-          AND LOWER(product_name) = LOWER(?)
-          AND id <> ?
-        """
         duplicate_rows = db.execute_query(
-            duplicate_query,
-            (normalized_certificate_type, normalized_product_name, rule_id)
+            SINGLE_UPDATE_DUPLICATE_QUERY,
+            (normalized_rule["certificate_type"], normalized_rule["product_name"], rule_id)
         )
         if duplicate_rows:
             raise ValueError("A rule with the same certificate_type and product_name already exists")
 
-        update_query = """
-        UPDATE validation_rules
-        SET certificate_type = ?,
-            product_name = ?,
-            is_active = ?
-        WHERE id = ?
-        """
         affected_rows = db.execute_non_query(
-            update_query,
+            SINGLE_UPDATE_QUERY,
             (
-                normalized_certificate_type,
-                normalized_product_name,
-                1 if is_active else 0,
+                normalized_rule["certificate_type"],
+                normalized_rule["product_name"],
+                1 if normalized_rule["is_active"] else 0,
                 rule_id
             )
         )
@@ -456,12 +310,12 @@ class RulesService:
         if affected_rows == 0:
             raise LookupError("Rule not found")
 
-        return {
-            "id": int(rule_id),
-            "certificate_type": normalized_certificate_type,
-            "product_name": normalized_product_name,
-            "is_active": bool(is_active)
-        }
+        return build_rule_response(
+            rule_id=int(rule_id),
+            certificate_type=normalized_rule["certificate_type"],
+            product_name=normalized_rule["product_name"],
+            is_active=bool(normalized_rule["is_active"]),
+        )
 
     def delete_rule(self, rule_id: int) -> Dict[str, Any]:
         """
@@ -473,28 +327,19 @@ class RulesService:
         Returns:
             Deleted rule summary
         """
-        find_query = """
-        SELECT TOP 1 id, certificate_type, product_name, is_active
-        FROM validation_rules
-        WHERE id = ?
-        """
-        existing = db.execute_query(find_query, (rule_id,))
+        existing = db.execute_query(SINGLE_FIND_FOR_DELETE_QUERY, (rule_id,))
         if not existing:
             raise LookupError("Rule not found")
 
         rule = existing[0]
 
-        delete_query = """
-        DELETE FROM validation_rules
-        WHERE id = ?
-        """
-        affected_rows = db.execute_non_query(delete_query, (rule_id,))
+        affected_rows = db.execute_non_query(SINGLE_DELETE_QUERY, (rule_id,))
         if affected_rows == 0:
             raise LookupError("Rule not found")
 
-        return {
-            "id": int(rule["id"]),
-            "certificate_type": rule["certificate_type"],
-            "product_name": rule["product_name"],
-            "is_active": bool(rule["is_active"])
-        }
+        return build_rule_response(
+            rule_id=int(rule["id"]),
+            certificate_type=rule["certificate_type"],
+            product_name=rule["product_name"],
+            is_active=bool(rule["is_active"]),
+        )
