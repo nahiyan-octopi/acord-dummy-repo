@@ -6,9 +6,9 @@ Uses GPT-4-turbo for intelligent data organization.
 """
 import asyncio
 import logging
+import os
 from pathlib import Path
 from typing import Optional, Dict, Any, List
-from concurrent.futures import ThreadPoolExecutor
 
 # PDF processing
 from pypdf import PdfReader
@@ -48,6 +48,10 @@ class UniversalPDFExtractor:
         """Initialize the PDF extractor"""
         self.config = config or Config
         self.openai_service = None  # Lazy initialization
+        if PYTESSERACT_AVAILABLE:
+            tesseract_cmd = os.getenv("TESSERACT_CMD")
+            if tesseract_cmd:
+                pytesseract.pytesseract.tesseract_cmd = tesseract_cmd
     
     async def extract_pdf(
         self,
@@ -109,36 +113,42 @@ class UniversalPDFExtractor:
             pypdf_task = loop.run_in_executor(None, run_pypdf)
             ocr_task = loop.run_in_executor(None, run_ocr)
             
-            # Wait for PyPDF first (usually faster)
-            direct_text = await pypdf_task
-            
-            ocr_text = ""
+            # Evaluate both extraction paths before selecting the final text source
+            direct_text, ocr_result = await asyncio.gather(pypdf_task, ocr_task)
+
+            if isinstance(ocr_result, tuple):
+                ocr_text, ocr_page_count = ocr_result
+            else:
+                ocr_text = ocr_result or ""
+                ocr_page_count = 0
+
+            direct_len = len((direct_text or "").strip())
+            ocr_len = len((ocr_text or "").strip())
+            text_source = "none"
             full_text = ""
-            
-            # Smart selection: Use PyPDF if successful, otherwise wait for OCR
-            if direct_text and len(direct_text.strip()) > 50:
-                print("Using PyPDF text extraction (successful)")
+
+            if ocr_len > max(200, int(direct_len * 1.2)):
+                print("Using OCR text extraction")
+                full_text = ocr_text
+                page_count = ocr_page_count
+                text_source = "ocr"
+            elif direct_len > 0:
+                print("Using PyPDF text extraction")
                 full_text = direct_text
-                
-                # Get page count from PyPDF
+                text_source = "pypdf"
+            elif ocr_len > 0:
+                print("Using OCR text extraction")
+                full_text = ocr_text
+                page_count = ocr_page_count
+                text_source = "ocr"
+
+            # Get page count from PDF if still unknown
+            if page_count <= 0:
                 try:
                     with open(pdf_path, 'rb') as f:
                         page_count = len(PdfReader(f).pages)
-                except:
+                except Exception:
                     page_count = 1
-            else:
-                # PyPDF failed, wait for OCR
-                print("PyPDF insufficient, waiting for OCR...")
-                ocr_result = await ocr_task
-                
-                if isinstance(ocr_result, tuple):
-                    ocr_text, page_count = ocr_result
-                else:
-                    ocr_text = ocr_result
-                    page_count = 0
-                
-                print("Using OCR text extraction")
-                full_text = ocr_text
             
             print(f"Total text for AI: {len(full_text)} characters")
             print(f"Form fields found: {len(form_fields.get('text_fields', {})) if form_fields else 0}")
@@ -210,6 +220,8 @@ class UniversalPDFExtractor:
                 "tokens_used": ai_result.get("usage", {}),
                 "model": self.config.OPENAI_MODEL,
                 "extraction_method": "universal_ai",
+                "text_source": text_source,
+                "ocr_available": PDF2IMAGE_AVAILABLE and PYTESSERACT_AVAILABLE,
                 "page_count": page_count
             }
             
@@ -250,12 +262,16 @@ class UniversalPDFExtractor:
         
         try:
             max_pages = self.config.MAX_PAGES
-            images = convert_from_path(
-                pdf_path,
-                dpi=dpi,
-                first_page=1,
-                last_page=max_pages
-            )
+            poppler_path = os.getenv("POPPLER_PATH")
+            convert_kwargs = {
+                "dpi": dpi,
+                "first_page": 1,
+                "last_page": max_pages
+            }
+            if poppler_path:
+                convert_kwargs["poppler_path"] = poppler_path
+
+            images = convert_from_path(pdf_path, **convert_kwargs)
             return images
         except Exception as e:
             print(f"Error converting PDF to images: {str(e)}")
