@@ -1,8 +1,10 @@
 """
 OpenAI API Service for GPT-4-turbo
 """
+import base64
 import json
-from typing import Optional, Dict, Any
+from io import BytesIO
+from typing import Optional, Dict, Any, List
 from openai import OpenAI
 from app.config.config import Config
 
@@ -223,6 +225,66 @@ CRITICAL RULES:
         
         # If all else fails, return the text as is
         return {"extracted_text": response_text}
+
+    def extract_text_from_images(self, images: List) -> str:
+        """
+        Extract text from PIL images using GPT-4o Vision.
+
+        Works on any serverless platform (no Tesseract/Poppler needed).
+
+        Args:
+            images: List of PIL Image objects (one per PDF page)
+
+        Returns:
+            Concatenated OCR text from all pages
+        """
+        all_text: List[str] = []
+
+        for i, image in enumerate(images, 1):
+            try:
+                # Convert PIL image to base64 JPEG
+                buf = BytesIO()
+                image.save(buf, format="JPEG", quality=85)
+                b64 = base64.b64encode(buf.getvalue()).decode("utf-8")
+
+                response = self.client.chat.completions.create(
+                    model=self.model,
+                    messages=[
+                        {
+                            "role": "user",
+                            "content": [
+                                {
+                                    "type": "text",
+                                    "text": (
+                                        "Extract ALL text from this document image exactly as it appears. "
+                                        "Preserve the layout, labels, field names, and values. "
+                                        "Return ONLY the extracted text, nothing else."
+                                    ),
+                                },
+                                {
+                                    "type": "image_url",
+                                    "image_url": {
+                                        "url": f"data:image/jpeg;base64,{b64}",
+                                        "detail": "high",
+                                    },
+                                },
+                            ],
+                        }
+                    ],
+                    max_tokens=self.max_tokens,
+                    temperature=0,
+                )
+
+                page_text = response.choices[0].message.content or ""
+                if page_text.strip():
+                    all_text.append(f"--- PAGE {i} ---\n{page_text}\n")
+                    print(f"Vision OCR page {i}: {len(page_text)} characters")
+
+            except Exception as e:
+                print(f"Warning: Vision OCR failed for page {i}: {e}")
+                continue
+
+        return "\n".join(all_text)
 
 
 # Singleton instance

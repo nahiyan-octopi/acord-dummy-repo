@@ -2,7 +2,11 @@
 Universal PDF Extractor
 
 Extracts data from any PDF using parallel PyPDF + OCR processing.
-Uses GPT-4-turbo for intelligent data organization.
+Uses GPT-4o for intelligent data organization.
+
+OCR strategy (in priority order):
+  1. pypdfium2 (bundled renderer, no system deps) + GPT-4o Vision
+  2. pdf2image/Poppler + Tesseract (requires system binaries)
 """
 import asyncio
 import logging
@@ -13,21 +17,27 @@ from typing import Optional, Dict, Any, List
 # PDF processing
 from pypdf import PdfReader
 
-# Try to import OCR dependencies (optional)
+# --- pypdfium2: serverless-safe PDF → image renderer ---
+try:
+    import pypdfium2 as pdfium
+    from PIL import Image as PILImage
+    PDFIUM_AVAILABLE = True
+except ImportError:
+    PDFIUM_AVAILABLE = False
+    print("Warning: pypdfium2 not installed. Serverless OCR disabled.")
+
+# --- Legacy OCR deps (need Poppler + Tesseract system binaries) ---
 try:
     from pdf2image import convert_from_path
-    from PIL import Image
     PDF2IMAGE_AVAILABLE = True
 except ImportError:
     PDF2IMAGE_AVAILABLE = False
-    print("Warning: pdf2image not installed. OCR fallback disabled.")
 
 try:
     import pytesseract
     PYTESSERACT_AVAILABLE = True
 except ImportError:
     PYTESSERACT_AVAILABLE = False
-    print("Warning: pytesseract not installed. OCR features disabled.")
 
 from app.config.config import Config
 from app.services.ai.openai_service import get_openai_service
@@ -48,10 +58,36 @@ class UniversalPDFExtractor:
         """Initialize the PDF extractor"""
         self.config = config or Config
         self.openai_service = None  # Lazy initialization
+        self.last_ocr_error = None
         if PYTESSERACT_AVAILABLE:
             tesseract_cmd = os.getenv("TESSERACT_CMD")
             if tesseract_cmd:
                 pytesseract.pytesseract.tesseract_cmd = tesseract_cmd
+
+    # ------------------------------------------------------------------ #
+    #  PDF → PIL images  (serverless-safe via pypdfium2)
+    # ------------------------------------------------------------------ #
+    def _render_pages_pdfium(self, pdf_path: str, dpi: int) -> List:
+        """Render PDF pages to PIL images using pypdfium2 (no Poppler)."""
+        if not PDFIUM_AVAILABLE:
+            return []
+        try:
+            pdf = pdfium.PdfDocument(pdf_path)
+            max_pages = min(len(pdf), self.config.MAX_PAGES)
+            scale = dpi / 72  # pypdfium2 default is 72 DPI
+            images = []
+            for i in range(max_pages):
+                page = pdf[i]
+                bitmap = page.render(scale=scale)
+                pil_image = bitmap.to_pil()
+                images.append(pil_image)
+            pdf.close()
+            print(f"pypdfium2: rendered {len(images)} pages at {dpi} DPI")
+            return images
+        except Exception as e:
+            self.last_ocr_error = f"pypdfium2 render failed: {e}"
+            print(f"Error rendering PDF with pypdfium2: {e}")
+            return []
     
     async def extract_pdf(
         self,
@@ -71,6 +107,7 @@ class UniversalPDFExtractor:
         dpi = dpi or self.config.PDF_DPI
         
         try:
+            self.last_ocr_error = None
             # Initialize OpenAI service on first use
             if self.openai_service is None:
                 self.openai_service = get_openai_service()
@@ -97,17 +134,29 @@ class UniversalPDFExtractor:
                 return text
             
             def run_ocr():
-                """Extract text using OCR (fallback)"""
-                if not PDF2IMAGE_AVAILABLE or not PYTESSERACT_AVAILABLE:
-                    return "", 0
-                
-                images = self._convert_pdf_to_images(pdf_path, dpi)
-                if not images:
-                    return "", 0
-                
-                ocr_text = self._extract_text_from_images(images)
-                print(f"OCR extraction: {len(ocr_text)} characters")
-                return ocr_text, len(images)
+                """
+                Extract text using OCR.
+                Strategy 1: pypdfium2 (render) + GPT-4o Vision (read)
+                Strategy 2: pdf2image/Poppler + Tesseract
+                """
+                # Strategy 1: pypdfium2 + Vision (works on Vercel / serverless)
+                images = self._render_pages_pdfium(pdf_path, dpi)
+                if images:
+                    ocr_text = self.openai_service.extract_text_from_images(images)
+                    if ocr_text and ocr_text.strip():
+                        print(f"Vision OCR extraction: {len(ocr_text)} characters")
+                        return ocr_text, len(images)
+
+                # Strategy 2: Poppler + Tesseract (traditional, needs system binaries)
+                if PDF2IMAGE_AVAILABLE and PYTESSERACT_AVAILABLE:
+                    legacy_images = self._convert_pdf_to_images(pdf_path, dpi)
+                    if legacy_images:
+                        ocr_text = self._extract_text_from_images(legacy_images)
+                        if ocr_text and ocr_text.strip():
+                            print(f"Tesseract OCR extraction: {len(ocr_text)} characters")
+                            return ocr_text, len(legacy_images)
+
+                return "", 0
             
             # Run PyPDF and OCR in parallel
             pypdf_task = loop.run_in_executor(None, run_pypdf)
@@ -156,7 +205,10 @@ class UniversalPDFExtractor:
             if not full_text and not form_fields:
                 return {
                     "success": False,
-                    "error": "No text could be extracted. Document may be image-only without readable text."
+                    "error": "No text could be extracted. Document may be image-only without readable text.",
+                    "ocr_available": PDFIUM_AVAILABLE or (PDF2IMAGE_AVAILABLE and PYTESSERACT_AVAILABLE),
+                    "ocr_error": self.last_ocr_error,
+                    "text_source": text_source
                 }
             
             # Build context for AI
@@ -221,7 +273,8 @@ class UniversalPDFExtractor:
                 "model": self.config.OPENAI_MODEL,
                 "extraction_method": "universal_ai",
                 "text_source": text_source,
-                "ocr_available": PDF2IMAGE_AVAILABLE and PYTESSERACT_AVAILABLE,
+                "ocr_available": PDFIUM_AVAILABLE or (PDF2IMAGE_AVAILABLE and PYTESSERACT_AVAILABLE),
+                "ocr_error": self.last_ocr_error,
                 "page_count": page_count
             }
             
@@ -274,6 +327,7 @@ class UniversalPDFExtractor:
             images = convert_from_path(pdf_path, **convert_kwargs)
             return images
         except Exception as e:
+            self.last_ocr_error = str(e)
             print(f"Error converting PDF to images: {str(e)}")
             return []
     
