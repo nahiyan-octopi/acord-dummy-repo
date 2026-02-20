@@ -172,7 +172,7 @@ class UniversalPDFExtractor:
                     ai_context += f"{clean_name}: {status}\n"
                 ai_context += "\n"
             
-            print(f"Sending {len(ai_context)} characters to GPT-4-turbo...")
+            print(f"Sending {len(ai_context)} characters to GPT-4o...")
             
             # Use OpenAI to extract and organize data
             ai_result = self.openai_service.extract_universal_data(ai_context)

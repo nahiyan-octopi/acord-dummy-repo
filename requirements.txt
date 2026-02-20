@@ -15,8 +15,7 @@ openai>=1.0.0
 sqlalchemy>=2.0.0
 pyodbc>=5.0.0
 
-# Vectorization / Search
-opensearch-py>=2.4.0
+# Networking
 requests>=2.31.0
 
 # OCR (optional, for universal extraction)

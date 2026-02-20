@@ -354,7 +354,7 @@ curl -X POST "http://localhost:8001/api/detect-acord" \
 
 ### `POST /api/vectorize`
 
-Extracts text from an uploaded PDF, applies chunking, and returns chunk-level embeddings.
+Runs the uploaded PDF through the extract-data pipeline (ACORD hybrid or Universal AI), then embeds the extracted formatted data.
 
 **Request:**
 
@@ -368,6 +368,7 @@ curl -X POST "http://localhost:8001/api/vectorize" \
 - `chunk_size = 1200`
 - `chunk_overlap = 150`
 - One output document per chunk with stable fields for downstream storage/search systems.
+- To force single-chunk output, set `VECTORIZE_SINGLE_CHUNK=true` in `.env`.
 
 **Response:**
 
@@ -386,6 +387,9 @@ curl -X POST "http://localhost:8001/api/vectorize" \
     "filename": "sample.pdf",
     "file_size": 210340
   },
+  "formatted_data": { "...same structure as extract-data..." },
+  "document_type": "ACORD Form",
+  "extraction_method": "acord_hybrid",
   "chunks": [
     {
       "doc_id": "36d3c8f1d6b824f07dff7d2a",
@@ -398,10 +402,8 @@ curl -X POST "http://localhost:8001/api/vectorize" \
       "metadata": {
         "filename": "sample.pdf",
         "file_size": 210340,
-        "page_count": 3,
-        "extraction_method": "pypdf",
-        "extraction_strategy": "form_fields_plus_page_text",
-        "form_field_count": 128
+        "document_type": "ACORD Form",
+        "extraction_method": "acord_hybrid"
       }
     }
   ]
@@ -439,18 +441,51 @@ Generates a query embedding with the same model and dimensions as `/api/vectoriz
 
 ---
 
+### Single-chunk mode response (`VECTORIZE_SINGLE_CHUNK=true`)
+
+When single-chunk mode is enabled, chunk collection fields are omitted (`total_chunks`, `embedded_chunks`, `failed_chunks`, `chunks`, and per-item `chunk_id`).
+
+```json
+{
+  "success": true,
+  "doc_id": "36d3c8f1d6b824f07dff7d2a",
+  "embedding_model": "text-embedding-3-small",
+  "embedding_dimensions": 1024,
+  "single_chunk_mode": true,
+  "file_info": {
+    "filename": "sample.pdf",
+    "file_size": 210340
+  },
+  "formatted_data": { "...same structure as extract-data..." },
+  "document_type": "ACORD Form",
+  "extraction_method": "acord_hybrid",
+  "embedding": [0.001, -0.003, "..."],
+  "created_at": "2026-02-20T10:30:00+00:00",
+  "has_embedding": true,
+  "metadata": {
+    "filename": "sample.pdf",
+    "file_size": 210340,
+    "document_type": "ACORD Form",
+    "extraction_method": "acord_hybrid"
+  }
+}
+```
+
+---
+
 ## ⚙️ Configuration
 
 Create a `.env` file with these key variables:
 
-| Variable             | Description              | Recommended                                        |
-| -------------------- | ------------------------ | -------------------------------------------------- |
-| `OPENAI_API_KEY`     | Your OpenAI API key      | _Required_                                         |
-| `OPENAI_MODEL`       | GPT model to use         | `gpt-4o-mini` (fast & cheap) or `gpt-4o` (fastest) |
-| `OPENAI_TEMPERATURE` | Model temperature (0-1)  | `0` (deterministic)                                |
-| `OPENAI_MAX_TOKENS`  | Maximum response tokens  | `2000`                                             |
-| `PDF_DPI`            | OCR resolution           | `300`                                              |
-| `MAX_PAGES`          | Maximum pages to process | `50`                                               |
+| Variable                 | Description                            | Recommended                                        |
+| ------------------------ | -------------------------------------- | -------------------------------------------------- |
+| `OPENAI_API_KEY`         | Your OpenAI API key                    | _Required_                                         |
+| `OPENAI_MODEL`           | GPT model to use                       | `gpt-4o-mini` (fast & cheap) or `gpt-4o` (fastest) |
+| `OPENAI_TEMPERATURE`     | Model temperature (0-1)                | `0` (deterministic)                                |
+| `OPENAI_MAX_TOKENS`      | Maximum response tokens                | `2000`                                             |
+| `VECTORIZE_SINGLE_CHUNK` | Return one embedding for the whole PDF | `false`                                            |
+| `PDF_DPI`                | OCR resolution                         | `300`                                              |
+| `MAX_PAGES`              | Maximum pages to process               | `50`                                               |
 
 ### Model Comparison
 

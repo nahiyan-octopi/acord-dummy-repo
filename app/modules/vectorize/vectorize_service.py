@@ -1,14 +1,14 @@
 """Service for PDF and query vectorization."""
+import os
 from datetime import datetime, timezone
 from hashlib import sha256
-from pathlib import Path
 from typing import Dict, Any, List, Optional
 
 from fastapi import UploadFile
 
 from app.services.ai.embedding_service import get_embedding_service
-from app.services.pypdf_extractor import extract_text_content, extract_form_fields_for_structuring
-from app.utils.utils import save_upload_file, cleanup_file, get_file_info
+from app.modules.extraction.extraction_service import ExtractionService
+from app.utils.utils import cleanup_file
 
 
 class VectorizeService:
@@ -16,7 +16,23 @@ class VectorizeService:
 
     CHUNK_SIZE = 1200
     CHUNK_OVERLAP = 150
-    MIN_PAGE_TEXT_CHARS = 300
+
+    def __init__(self):
+        self.extraction_service = ExtractionService()
+
+    @staticmethod
+    def _single_chunk_enabled() -> bool:
+        value = os.getenv("VECTORIZE_SINGLE_CHUNK")
+        if value is None:
+            raise ValueError("VECTORIZE_SINGLE_CHUNK is not set in environment variables")
+
+        normalized = value.strip().lower()
+        if normalized in {"1", "true", "yes", "on"}:
+            return True
+        if normalized in {"0", "false", "no", "off"}:
+            return False
+
+        raise ValueError("VECTORIZE_SINGLE_CHUNK must be a boolean value (true/false)")
 
     @staticmethod
     def _chunk_text(text: str, chunk_size: int, overlap: int) -> List[str]:
@@ -44,93 +60,107 @@ class VectorizeService:
         return chunks
 
     @staticmethod
-    def _build_doc_id(file_path: str, text: str) -> str:
-        path = Path(file_path)
-        try:
-            file_size = path.stat().st_size
-        except OSError:
-            file_size = 0
-        hash_source = f"{path.name}:{len(text)}:{file_size}"
+    def _build_doc_id(filename: str, text: str, file_size: int = 0) -> str:
+        hash_source = f"{filename}:{len(text)}:{file_size}"
         return sha256(hash_source.encode("utf-8")).hexdigest()[:24]
 
     @staticmethod
-    def _build_form_field_text(form_result: Dict[str, Any]) -> str:
-        if not form_result or not form_result.get("success"):
-            return ""
-
-        data = form_result.get("data") or {}
-        if not data:
+    def _build_text_from_formatted_data(formatted_data: Dict[str, Any]) -> str:
+        if not isinstance(formatted_data, dict) or not formatted_data:
             return ""
 
         lines: List[str] = []
-        for key, value in data.items():
-            key_text = str(key).strip()
-            value_text = str(value).strip() if value is not None else ""
-            if key_text and value_text:
-                lines.append(f"{key_text}: {value_text}")
 
-        return "\n".join(lines).strip()
+        def flatten(value: Any, prefix: str = "") -> None:
+            if isinstance(value, dict):
+                for key in sorted(value.keys()):
+                    child = value.get(key)
+                    next_prefix = f"{prefix}.{key}" if prefix else str(key)
+                    flatten(child, next_prefix)
+                return
 
-    def _select_vector_text(self, page_text: str, form_text: str) -> Dict[str, Any]:
-        normalized_page = (page_text or "").strip()
-        normalized_form = (form_text or "").strip()
+            if isinstance(value, list):
+                for index, item in enumerate(value):
+                    next_prefix = f"{prefix}[{index}]" if prefix else f"[{index}]"
+                    flatten(item, next_prefix)
+                return
 
-        page_len = len(normalized_page)
-        form_len = len(normalized_form)
+            value_text = "" if value is None else str(value).strip()
+            if value_text and prefix:
+                lines.append(f"{prefix}: {value_text}")
 
-        if normalized_form and page_len < self.MIN_PAGE_TEXT_CHARS:
-            return {
-                "text": normalized_form,
-                "strategy": "form_fields_only"
-            }
+        flatten(formatted_data)
 
-        if normalized_form and normalized_page:
-            merged = f"FORM_FIELDS\n{normalized_form}\n\nPAGE_TEXT\n{normalized_page}".strip()
-            return {
-                "text": merged,
-                "strategy": "form_fields_plus_page_text"
-            }
+        if not lines:
+            return ""
 
-        if normalized_form:
-            return {
-                "text": normalized_form,
-                "strategy": "form_fields_only"
-            }
-
-        return {
-            "text": normalized_page,
-            "strategy": "page_text_only"
-        }
+        return "FORMATTED_DATA\n" + "\n".join(lines).strip()
 
     async def vectorize_pdf(self, file: UploadFile) -> Dict[str, Any]:
-        save_success, file_path = await save_upload_file(file)
-        if not save_success:
-            return {
-                "success": False,
-                "error": file_path
-            }
+        """
+        Vectorize a PDF by running it through the extract-data pipeline
+        and then embedding the extracted formatted data.
+        """
+        file_path = None
 
         try:
-            extraction = extract_text_content(file_path)
-            if not extraction.get("success"):
+            # Step 1: Run the existing extract-data pipeline
+            extraction_result = await self.extraction_service.extract_data(file)
+            file_path = extraction_result.get("file_path")
+
+            if not extraction_result.get("success"):
                 return {
                     "success": False,
-                    "error": extraction.get("error", "Failed to extract PDF text")
+                    "error": extraction_result.get("error", "Extraction failed")
                 }
 
-            form_extraction = extract_form_fields_for_structuring(file_path)
-            form_text = self._build_form_field_text(form_extraction)
+            # Step 2: Build embeddable text from the extracted formatted_data
+            formatted_data = extraction_result.get("formatted_data", {})
+            full_text = self._build_text_from_formatted_data(formatted_data)
 
-            selected_content = self._select_vector_text(
-                page_text=(extraction.get("text") or ""),
-                form_text=form_text
-            )
-
-            full_text = (selected_content.get("text") or "").strip()
             if not full_text:
                 return {
                     "success": False,
                     "error": "No extractable text found in PDF"
+                }
+
+            # Step 3: Vectorize the extracted text
+            single_chunk_mode = self._single_chunk_enabled()
+
+            embedding_service = get_embedding_service()
+            file_info = extraction_result.get("file_info", {})
+            created_at = datetime.now(timezone.utc).isoformat()
+            doc_id = self._build_doc_id(
+                filename=file_info.get("filename", ""),
+                text=full_text,
+                file_size=file_info.get("file_size", 0)
+            )
+
+            base_metadata = {
+                "filename": file_info.get("filename"),
+                "file_size": file_info.get("file_size"),
+                "document_type": extraction_result.get("document_type", "Document"),
+                "extraction_method": extraction_result.get("extraction_method", "unknown"),
+            }
+
+            if single_chunk_mode:
+                single_embedding = embedding_service.embed_batch([full_text])[0]
+                has_embedding = any(value != 0.0 for value in single_embedding)
+
+                return {
+                    "success": True,
+                    "doc_id": doc_id,
+                    "embedding_model": embedding_service.config.MODEL,
+                    "embedding_dimensions": embedding_service.config.DIMENSIONS,
+                    "single_chunk_mode": True,
+                    "file_info": file_info,
+                    "formatted_data": formatted_data,
+                    "document_type": extraction_result.get("document_type", "Document"),
+                    "extraction_method": extraction_result.get("extraction_method", "unknown"),
+                    "embedding": single_embedding,
+                    "created_at": created_at,
+                    "has_embedding": has_embedding,
+                    "metadata": base_metadata
                 }
 
             chunks = self._chunk_text(
@@ -145,12 +175,7 @@ class VectorizeService:
                     "error": "No chunks generated from PDF text"
                 }
 
-            embedding_service = get_embedding_service()
             embeddings = embedding_service.embed_batch(chunks)
-
-            file_info = get_file_info(file_path)
-            created_at = datetime.now(timezone.utc).isoformat()
-            doc_id = self._build_doc_id(file_path=file_path, text=full_text)
 
             chunk_docs: List[Dict[str, Any]] = []
             embedded_chunks = 0
@@ -169,14 +194,7 @@ class VectorizeService:
                     "embedding": vector,
                     "created_at": created_at,
                     "has_embedding": has_embedding,
-                    "metadata": {
-                        "filename": file_info.get("filename"),
-                        "file_size": file_info.get("file_size"),
-                        "page_count": extraction.get("page_count", 0),
-                        "extraction_method": extraction.get("extraction_method", "pypdf"),
-                        "extraction_strategy": selected_content.get("strategy", "page_text_only"),
-                        "form_field_count": form_extraction.get("field_count", 0) if isinstance(form_extraction, dict) else 0
-                    }
+                    "metadata": base_metadata
                 })
 
             return {
@@ -190,6 +208,9 @@ class VectorizeService:
                 "embedded_chunks": embedded_chunks,
                 "failed_chunks": len(chunk_docs) - embedded_chunks,
                 "file_info": file_info,
+                "formatted_data": formatted_data,
+                "document_type": extraction_result.get("document_type", "Document"),
+                "extraction_method": extraction_result.get("extraction_method", "unknown"),
                 "chunks": chunk_docs
             }
         except Exception as exc:
@@ -198,7 +219,8 @@ class VectorizeService:
                 "error": str(exc)
             }
         finally:
-            cleanup_file(file_path)
+            if file_path:
+                cleanup_file(file_path)
 
     def vectorize_query(self, query: str) -> Dict[str, Any]:
         clean_query = (query or "").strip()
