@@ -387,9 +387,6 @@ curl -X POST "http://localhost:8001/api/vectorize" \
     "filename": "sample.pdf",
     "file_size": 210340
   },
-  "formatted_data": { "...same structure as extract-data..." },
-  "document_type": "ACORD Form",
-  "extraction_method": "acord_hybrid",
   "chunks": [
     {
       "doc_id": "36d3c8f1d6b824f07dff7d2a",
@@ -456,9 +453,7 @@ When single-chunk mode is enabled, chunk collection fields are omitted (`total_c
     "filename": "sample.pdf",
     "file_size": 210340
   },
-  "formatted_data": { "...same structure as extract-data..." },
-  "document_type": "ACORD Form",
-  "extraction_method": "acord_hybrid",
+  "text": "...full extracted document text...",
   "embedding": [0.001, -0.003, "..."],
   "created_at": "2026-02-20T10:30:00+00:00",
   "has_embedding": true,
@@ -477,15 +472,17 @@ When single-chunk mode is enabled, chunk collection fields are omitted (`total_c
 
 Create a `.env` file with these key variables:
 
-| Variable                 | Description                            | Recommended                                        |
-| ------------------------ | -------------------------------------- | -------------------------------------------------- |
-| `OPENAI_API_KEY`         | Your OpenAI API key                    | _Required_                                         |
-| `OPENAI_MODEL`           | GPT model to use                       | `gpt-4o-mini` (fast & cheap) or `gpt-4o` (fastest) |
-| `OPENAI_TEMPERATURE`     | Model temperature (0-1)                | `0` (deterministic)                                |
-| `OPENAI_MAX_TOKENS`      | Maximum response tokens                | `2000`                                             |
-| `VECTORIZE_SINGLE_CHUNK` | Return one embedding for the whole PDF | `false`                                            |
-| `PDF_DPI`                | OCR resolution                         | `300`                                              |
-| `MAX_PAGES`              | Maximum pages to process               | `50`                                               |
+| Variable                 | Description                                      | Recommended                                        |
+| ------------------------ | ------------------------------------------------ | -------------------------------------------------- |
+| `OPENAI_API_KEY`         | Your OpenAI API key                              | _Required_                                         |
+| `OPENAI_MODEL`           | GPT model to use                                 | `gpt-4o-mini` (fast & cheap) or `gpt-4o` (fastest) |
+| `OPENAI_TEMPERATURE`     | Model temperature (0-1)                          | `0` (deterministic)                                |
+| `OPENAI_MAX_TOKENS`      | Maximum response tokens                          | `2000`                                             |
+| `VECTORIZE_SINGLE_CHUNK` | Return one embedding for the whole PDF           | `false`                                            |
+| `PDF_DPI`                | OCR resolution                                   | `300`                                              |
+| `MAX_PAGES`              | Maximum pages to process                         | `50`                                               |
+| `TESSERACT_CMD`          | Full path to tesseract binary (Windows optional) | `C:\\Program Files\\Tesseract-OCR\\tesseract.exe`  |
+| `POPPLER_PATH`           | Path to Poppler `bin` folder (Windows optional)  | `C:\\poppler\\Library\\bin`                        |
 
 ### Model Comparison
 

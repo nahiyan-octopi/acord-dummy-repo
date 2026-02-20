@@ -154,9 +154,7 @@ class VectorizeService:
                     "embedding_dimensions": embedding_service.config.DIMENSIONS,
                     "single_chunk_mode": True,
                     "file_info": file_info,
-                    "formatted_data": formatted_data,
-                    "document_type": extraction_result.get("document_type", "Document"),
-                    "extraction_method": extraction_result.get("extraction_method", "unknown"),
+                    "text": full_text,
                     "embedding": single_embedding,
                     "created_at": created_at,
                     "has_embedding": has_embedding,
@@ -208,9 +206,6 @@ class VectorizeService:
                 "embedded_chunks": embedded_chunks,
                 "failed_chunks": len(chunk_docs) - embedded_chunks,
                 "file_info": file_info,
-                "formatted_data": formatted_data,
-                "document_type": extraction_result.get("document_type", "Document"),
-                "extraction_method": extraction_result.get("extraction_method", "unknown"),
                 "chunks": chunk_docs
             }
         except Exception as exc:
