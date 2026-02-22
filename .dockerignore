@@ -1,0 +1,33 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.egg-info
+.venv
+venv
+.env
+
+# IDE
+.vscode
+.idea
+*.swp
+
+# Project artifacts
+output/
+uploads/
+*.pdf
+
+# CI / deploy configs not needed in image
+Pipfile
+Pipfile.lock
+render.yaml
+vercel.json
+docker-compose.yml
+
+# Documentation
+README.md
+*.md
