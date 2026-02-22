@@ -38,9 +38,9 @@ RUN mkdir -p /app/uploads /app/output
 # Expose port
 EXPOSE 8001
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')" || exit 1
+# Health check (uses $PORT with fallback to 8001)
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+    CMD python -c "import os, urllib.request; urllib.request.urlopen(f'http://localhost:{os.environ.get(\"PORT\", 8001)}/health')" || exit 1
 
-# Run the application
-CMD ["uvicorn", "app.app:app", "--host", "0.0.0.0", "--port", "8001"]
+# Run the application — use $PORT if set (Railway/Render), otherwise default to 8001
+CMD sh -c "uvicorn app.app:app --host 0.0.0.0 --port ${PORT:-8001}"
